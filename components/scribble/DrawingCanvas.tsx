@@ -4,28 +4,49 @@ import {
   useEffect, useRef, useCallback, forwardRef, useImperativeHandle,
 } from 'react'
 import {
-  TOOL_PEN, TOOL_PENCIL, TOOL_TEXT, TOOL_LINE,
-  TOOL_CIRCLE, TOOL_RECT, TOOL_ARROW, TOOL_ERASER, TOOL_SELECT,
-  MAX_UNDO_STEPS,
+  TOOL_PEN, TOOL_PENCIL, TOOL_MARKER, TOOL_HIGHLIGHTER, TOOL_BRUSH,
+  TOOL_TEXT, TOOL_LINE, TOOL_CIRCLE, TOOL_RECT, TOOL_ARROW,
+  TOOL_ERASER, TOOL_SELECT, MAX_UNDO_STEPS,
 } from '@/lib/constants'
 import { hasDrawableFabricJson } from '@/lib/utils/scribbleContract'
+import { pointInPolygon, type ShirtTemplate } from '@/lib/utils/shirtTemplate'
 import type { StrokeEvent } from '@/lib/hooks/useShirtChannel'
 import type { ScribbleBox } from '@/lib/utils/scribbleContract'
 
 export type DrawingTool =
-  | typeof TOOL_PEN | typeof TOOL_PENCIL | typeof TOOL_TEXT
+  | typeof TOOL_PEN | typeof TOOL_PENCIL | typeof TOOL_MARKER
+  | typeof TOOL_HIGHLIGHTER | typeof TOOL_BRUSH | typeof TOOL_TEXT
   | typeof TOOL_LINE | typeof TOOL_CIRCLE | typeof TOOL_RECT
   | typeof TOOL_ARROW | typeof TOOL_ERASER | typeof TOOL_SELECT
+
+const FREEHAND_BRUSHES = new Set<DrawingTool>([
+  TOOL_PEN, TOOL_PENCIL, TOOL_MARKER, TOOL_HIGHLIGHTER, TOOL_BRUSH,
+])
 
 export interface DrawingCanvasRef {
   exportSvg(): string
   exportPng(): Promise<string>
   exportJson(): object
-  exportLayer(): Promise<{ box: ScribbleBox; canvasJson: object; canvasSvg: string } | null>
+  exportLayer(options?: { fullCanvas?: boolean }): Promise<{ box: ScribbleBox; canvasJson: object; canvasSvg: string } | null>
   addEmoji(emoji: string): void
+  addText(text: string, options?: { color?: string; fontSize?: number; fontFamily?: string; fontWeight?: number; backgroundColor?: string }): void
+  loadJson(fabricJson: object): void
   isEmpty(): boolean
   undo(): void
+  redo(): void
   clear(): void
+  /**
+   * Re-style every text-like object on the canvas with the supplied props.
+   * Used by Signature mode so the user can flip font / colour / size in the
+   * side panel and see the canvas update live without re-typing.
+   */
+  restyleAllText(options: {
+    fill?: string
+    fontFamily?: string
+    fontWeight?: number
+    fontSize?: number
+    backgroundColor?: string
+  }): void
 }
 
 interface DrawingCanvasProps {
@@ -39,7 +60,15 @@ interface DrawingCanvasProps {
   fontSize: 'sm' | 'md' | 'lg'
   fontStyle: 'normal' | 'bold' | 'italic'
   onStroke: (fabricJson: object) => void
+  initialJson?: object | null
   onRemoteStroke?: (handler: (event: StrokeEvent) => void) => void
+  clipPath?: string
+  /**
+   * Optional polygon (in canvas coordinates) used to snap-clamp text/sticker
+   * spawn points to the drawable region. When provided alongside `clipPath`
+   * it guarantees the visible clipping AND the spawn coordinates agree.
+   */
+  drawablePolygon?: ShirtTemplate['drawablePolygon']
 }
 
 type FabricModule = typeof import('fabric')
@@ -53,6 +82,25 @@ type FabricRect = { left: number; top: number; width: number; height: number }
 const FONT_SIZE_MAP = { sm: 14, md: 20, lg: 28 }
 const MIN_SHAPE_DRAG = 3
 const LAYER_PADDING = 10
+
+function applyClipPath(canvas: FabricCanvas, mod: FabricModule, clipPath?: string) {
+  const clippedCanvas = canvas as FabricCanvas & { clipPath?: FabricObject }
+  if (!clipPath) {
+    clippedCanvas.clipPath = undefined
+    canvas.requestRenderAll()
+    return
+  }
+
+  const path = new mod.Path(clipPath, {
+    left: 0,
+    top: 0,
+    selectable: false,
+    evented: false,
+    absolutePositioned: true,
+  } as ConstructorParameters<typeof mod.Path>[1]) as FabricObject
+  clippedCanvas.clipPath = path
+  canvas.requestRenderAll()
+}
 
 function getCanvasPoint(canvas: FabricCanvas, event: FabricEvent): Point {
   const pointer = event.scenePoint ?? (canvas as unknown as {
@@ -100,14 +148,65 @@ function getObjectsBounds(objects: FabricObject[], canvasW: number, canvasH: num
   return clampRect({ left, top, width: right - left, height: bottom - top }, canvasW, canvasH)
 }
 
+/**
+ * Find the closest point inside the drawable polygon. We use this to gently
+ * snap text/sticker spawn coordinates back inside the shirt when the user
+ * taps just outside the clipped region. Iterating polygon edges is cheap for
+ * the ~10-vertex shirt polygon and avoids pulling in a heavier geometry lib.
+ */
+function snapPointInsidePolygon(point: Point, polygon: ShirtTemplate['drawablePolygon']): Point {
+  if (pointInPolygon(point, polygon)) return point
+
+  let bestX = point.x
+  let bestY = point.y
+  let bestDist = Number.POSITIVE_INFINITY
+
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]
+    const b = polygon[(i + 1) % polygon.length]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const lenSq = dx * dx + dy * dy
+    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq))
+    const projX = a.x + t * dx
+    const projY = a.y + t * dy
+    const distSq = (projX - point.x) ** 2 + (projY - point.y) ** 2
+    if (distSq < bestDist) {
+      bestDist = distSq
+      bestX = projX
+      bestY = projY
+    }
+  }
+
+  // Pull the snap point a few px deeper toward the polygon centroid so the
+  // spawned object isn't *on* the edge (where Fabric handles would clip).
+  let cx = 0
+  let cy = 0
+  for (const vertex of polygon) {
+    cx += vertex.x
+    cy += vertex.y
+  }
+  cx /= polygon.length
+  cy /= polygon.length
+  const towardCenterX = cx - bestX
+  const towardCenterY = cy - bestY
+  const towardLen = Math.hypot(towardCenterX, towardCenterY) || 1
+  const inset = Math.min(12, towardLen)
+  return {
+    x: bestX + (towardCenterX / towardLen) * inset,
+    y: bestY + (towardCenterY / towardLen) * inset,
+  }
+}
+
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function DrawingCanvas(
-  { w, h, tool, color, brushSize, opacity, fillShapes, fontSize, fontStyle, onStroke, onRemoteStroke },
+  { w, h, tool, color, brushSize, opacity, fillShapes, fontSize, fontStyle, onStroke, initialJson, onRemoteStroke, clipPath, drawablePolygon },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const fabricRef = useRef<FabricCanvas | null>(null)
   const fabricMod = useRef<FabricModule | null>(null)
   const undoStack = useRef<string[]>([])
+  const redoStack = useRef<string[]>([])
   const isPointerDown = useRef(false)
   const liveShape = useRef<{ kind: LiveShapeKind; object: FabricObject; start: Point } | null>(null)
 
@@ -119,6 +218,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
   const onStrokeRef = useRef(onStroke)
   const fontSzRef = useRef(fontSize)
   const fontStRef = useRef(fontStyle)
+  const polygonRef = useRef(drawablePolygon)
 
   useEffect(() => { colorRef.current = color }, [color])
   useEffect(() => { opacityRef.current = opacity }, [opacity])
@@ -128,12 +228,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
   useEffect(() => { onStrokeRef.current = onStroke }, [onStroke])
   useEffect(() => { fontSzRef.current = fontSize }, [fontSize])
   useEffect(() => { fontStRef.current = fontStyle }, [fontStyle])
+  useEffect(() => { polygonRef.current = drawablePolygon }, [drawablePolygon])
 
   const pushSnapshot = useCallback((canvas: FabricCanvas) => {
     const json = JSON.stringify(canvas.toJSON())
     const last = undoStack.current[undoStack.current.length - 1]
     if (json === last) return
     undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_STEPS - 1)), json]
+    redoStack.current = []
   }, [])
 
   const commitCanvas = useCallback((canvas: FabricCanvas) => {
@@ -193,6 +295,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       fabricRef.current = liveCanvas
       fabricMod.current = mod
       liveCanvas.freeDrawingBrush = new mod.PencilBrush(liveCanvas)
+      applyClipPath(liveCanvas, mod, clipPath)
 
       const canvasDom = liveCanvas as unknown as {
         wrapperEl?: HTMLElement
@@ -216,14 +319,20 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
         }
 
         if (
-          activeTool === TOOL_PEN ||
-          activeTool === TOOL_PENCIL ||
+          FREEHAND_BRUSHES.has(activeTool) ||
           activeTool === TOOL_SELECT
         ) {
           return
         }
 
-        const point = getCanvasPoint(liveCanvas, event)
+        const rawPoint = getCanvasPoint(liveCanvas, event)
+        // Snap text/sticker spawn coordinates back inside the drawable polygon
+        // so a tap on the shirt's chrome (collar, sleeves) still produces an
+        // object that is visible inside the clipped area. Freehand strokes
+        // are clipped at the Fabric level via `clipPath`, so this guard only
+        // matters for spawn-based primitives.
+        const polygon = polygonRef.current
+        const point = polygon ? snapPointInsidePolygon(rawPoint, polygon) : rawPoint
         const col = colorRef.current
         const strokeWidth = brushSzRef.current
         const op = opacityRef.current
@@ -404,7 +513,19 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       liveCanvas.on('mouse:up', handleMouseUp)
 
       liveCanvas.on('path:created', ({ path }) => {
-        path.set({ opacity: opacityRef.current, selectable: false, evented: false })
+        const activeTool = toolRef.current
+        // Mirror the brush's stroke styling onto the resulting Path so the
+        // SVG export (which the rest of the app uses for compositing) shows
+        // a marker/highlighter that matches what the user saw while drawing.
+        const strokeLineCap: CanvasLineCap = activeTool === TOOL_HIGHLIGHTER ? 'butt' : 'round'
+        const strokeLineJoin: CanvasLineJoin = activeTool === TOOL_HIGHLIGHTER ? 'miter' : 'round'
+        path.set({
+          opacity: opacityRef.current,
+          selectable: false,
+          evented: false,
+          strokeLineCap,
+          strokeLineJoin,
+        })
         liveCanvas.requestRenderAll()
         commitCanvas(liveCanvas)
       })
@@ -416,6 +537,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       liveCanvas.on('object:modified', () => {
         commitCanvas(liveCanvas)
       })
+
+      if (initialJson && hasDrawableFabricJson(initialJson)) {
+        void liveCanvas.loadFromJSON(initialJson).then(() => {
+          liveCanvas.renderAll()
+          pushSnapshot(liveCanvas)
+          onStrokeRef.current(liveCanvas.toJSON())
+        })
+      }
 
       if (onRemoteStroke) {
         onRemoteStroke(({ fabricJson }) => {
@@ -441,7 +570,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       isPointerDown.current = false
       host.replaceChildren()
     }
-  }, [w, h, onRemoteStroke, commitCanvas, eraseTarget, pushSnapshot])
+  }, [w, h, initialJson, onRemoteStroke, commitCanvas, eraseTarget, pushSnapshot, clipPath])
 
   useEffect(() => {
     const canvas = fabricRef.current
@@ -473,13 +602,45 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       return
     }
 
-    if (tool === TOOL_PEN || tool === TOOL_PENCIL) {
+    if (FREEHAND_BRUSHES.has(tool)) {
+      // Each brush is a Fabric `PencilBrush` with a distinct stroke-param
+      // profile. We deliberately do NOT swap to SprayBrush — keeping all
+      // brushes in PencilBrush keeps `path:created` semantics identical for
+      // undo/redo, layer export, and JSON round-tripping. Differences in
+      // stroke feel are achieved via width clamps, opacity, decimation and
+      // cap/join styles applied to the resulting path on `path:created`.
       const brush = new mod.PencilBrush(canvas)
       brush.color = color
       brush.width = brushSize
-      if (tool === TOOL_PENCIL) {
-        ;(brush as unknown as { decimate: number }).decimate = 10
+
+      const brushAny = brush as unknown as {
+        decimate?: number
+        strokeLineCap?: CanvasLineCap
+        strokeLineJoin?: CanvasLineJoin
       }
+
+      if (tool === TOOL_PENCIL) {
+        brushAny.decimate = 10
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+      } else if (tool === TOOL_MARKER) {
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+        brushAny.decimate = 2
+      } else if (tool === TOOL_HIGHLIGHTER) {
+        brushAny.strokeLineCap = 'butt'
+        brushAny.strokeLineJoin = 'miter'
+        brushAny.decimate = 2
+      } else if (tool === TOOL_BRUSH) {
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+        brushAny.decimate = 4
+      } else {
+        // TOOL_PEN — clean default.
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+      }
+
       canvas.freeDrawingBrush = brush
       canvas.isDrawingMode = true
       canvas.defaultCursor = 'crosshair'
@@ -503,10 +664,18 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       return canvas.toDataURL({ format: 'png', multiplier: 1 }).split(',')[1]
     },
     exportJson: () => fabricRef.current?.toJSON() ?? {},
-    exportLayer: async () => {
+    exportLayer: async (options) => {
       const canvas = fabricRef.current
       const mod = fabricMod.current
       if (!canvas || !mod) return null
+
+      if (options?.fullCanvas) {
+        return {
+          box: { x: 0, y: 0, w, h },
+          canvasJson: canvas.toJSON(),
+          canvasSvg: canvas.toSVG(),
+        }
+      }
 
       const objects = canvas.getObjects().filter(object => {
         const json = object.toObject() as Record<string, unknown>
@@ -559,13 +728,57 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       canvas.requestRenderAll()
       commitCanvas(canvas)
     },
+    addText: (text, options) => {
+      const canvas = fabricRef.current
+      const mod = fabricMod.current
+      if (!canvas || !mod || !text.trim()) return
+      cancelLiveShape()
+      const label = new mod.IText(text.trim(), {
+        left: Math.max(18, Math.min(w - 180, w / 2 - 90)),
+        top: Math.max(18, Math.min(h - 80, h / 2 - 40)),
+        fontFamily: options?.fontFamily,
+        fontSize: options?.fontSize ?? FONT_SIZE_MAP[fontSzRef.current],
+        fontWeight: options?.fontWeight ?? (fontStRef.current === 'bold' ? 'bold' : 'normal'),
+        fontStyle: fontStRef.current === 'italic' ? 'italic' : 'normal',
+        fill: options?.color ?? colorRef.current,
+        backgroundColor: options?.backgroundColor,
+        opacity: opacityRef.current,
+        editable: true,
+        selectable: true,
+        evented: true,
+      })
+      canvas.add(label)
+      canvas.setActiveObject(label)
+      canvas.requestRenderAll()
+      commitCanvas(canvas)
+    },
+    loadJson: (fabricJson: object) => {
+      const canvas = fabricRef.current
+      if (!canvas || !hasDrawableFabricJson(fabricJson)) return
+      void canvas.loadFromJSON(fabricJson).then(() => {
+        canvas.renderAll()
+        pushSnapshot(canvas)
+        onStrokeRef.current(canvas.toJSON())
+      })
+    },
     isEmpty: () => !hasDrawableFabricJson(fabricRef.current?.toJSON() ?? {}),
     undo: () => {
       const canvas = fabricRef.current
       if (!canvas || undoStack.current.length <= 1) return
-      undoStack.current.pop()
+      const current = undoStack.current.pop()
+      if (current) redoStack.current.push(current)
       const previous = undoStack.current[undoStack.current.length - 1]
       void canvas.loadFromJSON(JSON.parse(previous)).then(() => {
+        canvas.renderAll()
+        onStrokeRef.current(canvas.toJSON())
+      })
+    },
+    redo: () => {
+      const canvas = fabricRef.current
+      const next = redoStack.current.pop()
+      if (!canvas || !next) return
+      undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_STEPS - 1)), next]
+      void canvas.loadFromJSON(JSON.parse(next)).then(() => {
         canvas.renderAll()
         onStrokeRef.current(canvas.toJSON())
       })
@@ -578,6 +791,28 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       canvas.discardActiveObject()
       canvas.renderAll()
       commitCanvas(canvas)
+    },
+    restyleAllText: (options) => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+      let dirty = false
+      for (const object of canvas.getObjects()) {
+        const objAny = object as FabricObject & { type?: string }
+        const type = String(objAny.type ?? '').toLowerCase()
+        if (!type.includes('text')) continue
+        const patch: Record<string, unknown> = {}
+        if (options.fill !== undefined) patch.fill = options.fill
+        if (options.fontFamily !== undefined) patch.fontFamily = options.fontFamily
+        if (options.fontWeight !== undefined) patch.fontWeight = options.fontWeight
+        if (options.fontSize !== undefined) patch.fontSize = options.fontSize
+        if (options.backgroundColor !== undefined) patch.backgroundColor = options.backgroundColor
+        object.set(patch)
+        dirty = true
+      }
+      if (dirty) {
+        canvas.requestRenderAll()
+        commitCanvas(canvas)
+      }
     },
   }))
 

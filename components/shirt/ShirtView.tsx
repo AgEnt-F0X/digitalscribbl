@@ -7,12 +7,21 @@ import DrawingCanvas, { type DrawingCanvasRef, type DrawingTool } from '@/compon
 import ScribbleToolbar from '@/components/scribble/ScribbleToolbar'
 import ShirtShell from '@/components/shirt/ShirtShell'
 import { useShirtChannel } from '@/lib/hooks/useShirtChannel'
-import { hasDrawableFabricJson } from '@/lib/utils/scribbleContract'
+import { clampScribbleBoxToCanvas, hasDrawableFabricJson, type ScribbleBox } from '@/lib/utils/scribbleContract'
+import {
+  getShirtTemplate,
+  isBoxInsideDrawableRegion,
+  SHIRT_COORDINATE_SPACE,
+  SHIRT_TEMPLATE_ID,
+} from '@/lib/utils/shirtTemplate'
+import { createActionCooldown } from '@/lib/utils/actionCooldown'
+import { showToast } from '@/lib/hooks/useToast'
 import { CANVAS_COLORS, SHIRT_H, SHIRT_W, TOOL_PEN, TOOL_TEXT } from '@/lib/constants'
 import { cn } from '@/lib/utils/cn'
 import type { Panel, ScribbleRow, ShirtRow } from '@/lib/supabase/types'
 
 type ScribbleMode = 'browse' | 'drawing'
+type SigningMode = 'direct' | 'compose'
 type SuggestedSpotKind = 'best' | 'big' | 'edge'
 
 interface SuggestedSpot {
@@ -39,11 +48,23 @@ interface ShirtViewProps {
   headBackUrl?:       string | null
   yearbookQuote?:     string | null
   textureUrl?:        string
+  /** Server-fetched free-tier degrade flags. See docs/09. */
+  disablePresence?:  boolean
+  disableBroadcast?: boolean
   onScribblePlaced?:  () => void
 }
 
 const ZOOM_LEVELS = [1, 1.35, 1.75, 2.25, 3]
 const QUICK_EMOJI = '🫶'
+const COMPOSE_BOX_SIZE = { w: 180, h: 130 }
+
+function defaultComposeBox(): ScribbleBox {
+  return {
+    x: Math.round((SHIRT_W - COMPOSE_BOX_SIZE.w) / 2),
+    y: 250,
+    ...COMPOSE_BOX_SIZE,
+  }
+}
 
 function overlapArea(a: SuggestedSpot, b: Pick<ScribbleRow, 'x' | 'y' | 'w' | 'h'>) {
   const left = Math.max(a.x, b.x)
@@ -120,12 +141,16 @@ export default function ShirtView({
   headBackUrl,
   yearbookQuote,
   onScribblePlaced,
+  disablePresence = false,
+  disableBroadcast = false,
 }: ShirtViewProps) {
   const router = useRouter()
   const drawingRef = useRef<DrawingCanvasRef>(null)
   const studioScrollRef = useRef<HTMLDivElement>(null)
+  const actionCooldownRef = useRef(createActionCooldown({ cooldownMs: 900 }))
 
   const [mode, setMode] = useState<ScribbleMode>('browse')
+  const [signingMode, setSigningMode] = useState<SigningMode>('direct')
   const [tool, setTool] = useState<DrawingTool>(TOOL_PEN)
   const [color, setColor] = useState<string>(CANVAS_COLORS[0])
   const [brushSize, setBrushSize] = useState(4)
@@ -134,6 +159,7 @@ export default function ShirtView({
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md')
   const [fontStyle, setFontStyle] = useState<'normal' | 'bold' | 'italic'>('normal')
   const [zoomIndex, setZoomIndex] = useState(0)
+  const [showAvatarInStudio, setShowAvatarInStudio] = useState(true)
   const [hasDrawing, setHasDrawing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -142,6 +168,8 @@ export default function ShirtView({
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set())
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [focusSpot, setFocusSpot] = useState<SuggestedSpot | null>(null)
+  const [draftJson, setDraftJson] = useState<object | null>(null)
+  const [composeBox, setComposeBox] = useState<ScribbleBox>(() => defaultComposeBox())
 
   const {
     viewerCount,
@@ -153,6 +181,8 @@ export default function ShirtView({
     currentPanel: panel,
     currentUserId,
     currentUserName,
+    disablePresence,
+    disableBroadcast,
   })
 
   useEffect(() => {
@@ -170,6 +200,11 @@ export default function ShirtView({
   const displayedScribbles = existingScribbles.filter(s => !removedIds.has(s.id))
   const headUrl = panel === 'back' ? (headBackUrl ?? headFrontUrl) : headFrontUrl
   const zoom = ZOOM_LEVELS[zoomIndex]
+  const shirtTemplate = getShirtTemplate(panel)
+  const draftKeyFor = useCallback((nextMode: SigningMode) => (
+    `scribbl:draft:${ownerId}:${shirt.shirt_number}:${panel}:${currentUserId ?? 'guest'}:${nextMode}`
+  ), [currentUserId, ownerId, panel, shirt.shirt_number])
+  const draftKey = draftKeyFor(signingMode)
 
   const panelOccupancy: Record<Panel, number> = {
     front: Number(shirt.front_occupancy ?? 0),
@@ -190,13 +225,33 @@ export default function ShirtView({
   }
 
   const enterStudio = useCallback(() => {
+    const nextMode: SigningMode = 'direct'
+    const nextDraftKey = draftKeyFor(nextMode)
+    const savedDraft = typeof window !== 'undefined' ? window.localStorage.getItem(nextDraftKey) : null
+    let restoredHasDrawing = false
+    setSigningMode(nextMode)
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft) as object
+        setDraftJson(hasDrawableFabricJson(parsed) ? parsed : null)
+        if (hasDrawableFabricJson(parsed)) {
+          restoredHasDrawing = true
+          showToast({ tone: 'info', title: 'Draft restored', body: 'Your unsaved mark is back on the canvas.' })
+        }
+      } catch {
+        setDraftJson(null)
+      }
+    } else {
+      setDraftJson(null)
+    }
     setMode('drawing')
     setZoomIndex(1)
     setTool(TOOL_PEN)
-    setHasDrawing(false)
+    setHasDrawing(restoredHasDrawing)
     setError(null)
     setFocusSpot(null)
-  }, [])
+    setComposeBox(findSuggestedSpot('big', panel, displayedScribbles))
+  }, [displayedScribbles, draftKeyFor, panel])
 
   const cancelStudio = useCallback(() => {
     setMode('browse')
@@ -204,19 +259,59 @@ export default function ShirtView({
     setHasDrawing(false)
     setError(null)
     setFocusSpot(null)
-  }, [])
+    setDraftJson(null)
+    if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey)
+  }, [draftKey])
+
+  const switchSigningMode = useCallback((nextMode: SigningMode) => {
+    setSigningMode(nextMode)
+    setTool(TOOL_PEN)
+    setError(null)
+    setFocusSpot(null)
+    const nextDraftKey = draftKeyFor(nextMode)
+    const savedDraft = typeof window !== 'undefined' ? window.localStorage.getItem(nextDraftKey) : null
+    if (!savedDraft) {
+      setDraftJson(null)
+      setHasDrawing(false)
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(savedDraft) as object
+      const drawable = hasDrawableFabricJson(parsed)
+      setDraftJson(drawable ? parsed : null)
+      setHasDrawing(drawable)
+      if (drawable) {
+        showToast({
+          tone: 'info',
+          title: nextMode === 'direct' ? 'Direct draft restored' : 'Compose draft restored',
+          body: 'Your unsaved mark is back on the canvas.',
+        })
+      }
+    } catch {
+      setDraftJson(null)
+      setHasDrawing(false)
+    }
+  }, [draftKeyFor])
 
   const handleLocalStroke = useCallback((fabricJson: object) => {
     const drawable = hasDrawableFabricJson(fabricJson)
     setHasDrawing(drawable)
     if (drawable) setFocusSpot(null)
-  }, [])
+    if (typeof window === 'undefined') return
+    if (drawable) {
+      window.localStorage.setItem(draftKey, JSON.stringify(fabricJson))
+    } else {
+      window.localStorage.removeItem(draftKey)
+    }
+  }, [draftKey])
 
   const focusSuggestedSpot = useCallback((kind: SuggestedSpotKind) => {
     const spot = findSuggestedSpot(kind, panel, displayedScribbles)
     const nextZoomIndex = kind === 'big' ? 2 : 1
 
     setFocusSpot(spot)
+    setComposeBox(spot)
     setZoomIndex(nextZoomIndex)
 
     window.requestAnimationFrame(() => {
@@ -238,15 +333,51 @@ export default function ShirtView({
     })
   }, [displayedScribbles, panel])
 
-  const handleSaveDirect = useCallback(async () => {
+  const handleComposePlacement = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (signingMode !== 'compose') return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const point = {
+      x: ((event.clientX - rect.left) / rect.width) * SHIRT_W,
+      y: ((event.clientY - rect.top) / rect.height) * SHIRT_H,
+    }
+    const candidate = clampScribbleBoxToCanvas({
+      x: point.x - composeBox.w / 2,
+      y: point.y - composeBox.h / 2,
+      w: composeBox.w,
+      h: composeBox.h,
+    }, { maxSize: 260 })
+
+    if (!isBoxInsideDrawableRegion(candidate, panel)) {
+      setError('Place the note inside the shirt body, away from the collar and edges.')
+      showToast({ tone: 'warning', title: 'Choose a shirt area', body: 'Notes need to sit inside the drawable shirt region.' })
+      return
+    }
+
+    setError(null)
+    setFocusSpot({ ...candidate, label: 'composed note spot' })
+    setComposeBox(candidate)
+  }, [composeBox.h, composeBox.w, panel, signingMode])
+
+  const handleSaveScribble = useCallback(async () => {
     if (!drawingRef.current) return
+    if (!actionCooldownRef.current.canRun(`save:${draftKey}`)) {
+      showToast({ tone: 'warning', title: 'Saving already queued', body: 'Wait a moment before trying again.' })
+      return
+    }
     setIsSaving(true)
     setError(null)
 
     try {
-      const layer = await drawingRef.current.exportLayer()
+      const layer = await drawingRef.current.exportLayer({ fullCanvas: signingMode === 'compose' })
       if (!layer || drawingRef.current.isEmpty()) {
         setError('Draw or add something before saving.')
+        setIsSaving(false)
+        return
+      }
+
+      const saveBox = signingMode === 'direct' ? layer.box : composeBox
+      if (signingMode === 'compose' && !isBoxInsideDrawableRegion(saveBox, panel)) {
+        setError('Move the composed note inside the shirt before saving.')
         setIsSaving(false)
         return
       }
@@ -255,14 +386,16 @@ export default function ShirtView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          placement_mode: 'direct',
+          placement_mode: signingMode,
+          template_id: SHIRT_TEMPLATE_ID,
+          coordinate_space: SHIRT_COORDINATE_SPACE,
           owner_id: ownerId,
           shirt_number: shirt.shirt_number,
           panel,
-          x: layer.box.x,
-          y: layer.box.y,
-          w: layer.box.w,
-          h: layer.box.h,
+          x: saveBox.x,
+          y: saveBox.y,
+          w: saveBox.w,
+          h: saveBox.h,
           canvas_svg: layer.canvasSvg,
           canvas_json: layer.canvasJson,
         }),
@@ -273,9 +406,11 @@ export default function ShirtView({
         const messages: Record<string, string> = {
           EMPTY_CANVAS: 'Draw or add something before saving.',
           INVALID_BOX: 'That mark could not be placed on the shirt. Try a smaller area.',
+          DIRECT_LAYER_REQUIRED: 'Direct drawing must be saved as a clipped shirt layer. Refresh and try again.',
           INVALID_SVG: 'This drawing could not be saved safely. Try clearing and drawing again.',
           FORBIDDEN: body.error ?? 'You cannot scribble on this shirt right now.',
           SAVE_FAILED: 'Failed to save scribble. Please try again.',
+          RATE_LIMITED: 'Too many save attempts. Wait a moment and try again.',
         }
         setError(messages[String(body.code)] ?? body.error ?? 'Something went wrong')
         setIsSaving(false)
@@ -283,6 +418,8 @@ export default function ShirtView({
       }
 
       broadcastTextureUpdated(panel)
+      if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey)
+      showToast({ tone: 'success', title: 'Scribble saved', body: `${ownerName}'s shirt was updated.` })
       setMode('browse')
       setZoomIndex(0)
       setHasDrawing(false)
@@ -290,10 +427,11 @@ export default function ShirtView({
       router.refresh()
     } catch {
       setError('Network error. Please try again.')
+      showToast({ tone: 'error', title: 'Network error', body: 'Your drawing draft is still saved locally.' })
     } finally {
       setIsSaving(false)
     }
-  }, [broadcastTextureUpdated, onScribblePlaced, ownerId, panel, router, shirt.shirt_number])
+  }, [broadcastTextureUpdated, composeBox, draftKey, onScribblePlaced, ownerId, ownerName, panel, router, shirt.shirt_number, signingMode])
 
   const handleRemoveScribble = useCallback(async (scribbleId: string) => {
     setRemovedIds(prev => new Set([...prev, scribbleId]))
@@ -307,20 +445,27 @@ export default function ShirtView({
 
     if (res.ok) {
       broadcastTextureUpdated(panel)
+      showToast({ tone: 'success', title: 'Scribble removed' })
       router.refresh()
     } else {
       setRemovedIds(prev => { const next = new Set(prev); next.delete(scribbleId); return next })
       setRemoveError('Could not remove scribble. Try again.')
+      showToast({ tone: 'error', title: 'Could not remove scribble' })
     }
   }, [broadcastTextureUpdated, panel, router])
 
   const handleReportScribble = useCallback(async (scribbleId: string) => {
     if (reportedIds.has(scribbleId)) return
+    if (!actionCooldownRef.current.canRun(`report:${scribbleId}`)) return
     setReportedIds(prev => new Set([...prev, scribbleId]))
-    await fetch('/api/scribble/report', {
+    const res = await fetch('/api/scribble/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scribble_id: scribbleId }),
+    })
+    showToast({
+      tone: res.ok || res.status === 409 ? 'success' : 'error',
+      title: res.ok || res.status === 409 ? 'Report received' : 'Could not report scribble',
     })
   }, [reportedIds])
 
@@ -420,7 +565,8 @@ export default function ShirtView({
             shirtColor={shirtColor}
             headUrl={headUrl}
             panel={panel}
-            className="max-w-[640px]"
+            showHead={mode === 'browse' || showAvatarInStudio}
+            className={cn(mode === 'drawing' && !showAvatarInStudio ? 'max-w-[760px]' : 'max-w-[640px]')}
           >
             {mode === 'browse' && (
               <div className="absolute inset-0">
@@ -439,7 +585,7 @@ export default function ShirtView({
               <div
                 ref={studioScrollRef}
                 className="absolute inset-0 overflow-auto bg-white/0"
-                style={{ touchAction: 'pan-x pan-y' }}
+                style={{ touchAction: signingMode === 'compose' ? 'none' : 'pan-x pan-y' }}
               >
                 <div
                   className="relative min-h-full min-w-full"
@@ -449,34 +595,46 @@ export default function ShirtView({
                   }}
                 >
                   {renderSavedScribbles(false)}
-                  {focusSpot && (
+                  {signingMode === 'compose' && (
                     <div
-                      className="pointer-events-none absolute rounded-2xl border-2 border-ink-900/50 bg-ink-900/5 shadow-[0_0_0_9999px_rgba(255,255,255,0.18)]"
+                      className="absolute inset-0 z-20 cursor-crosshair"
+                      onPointerDown={handleComposePlacement}
+                      aria-label="Choose where to place your composed note"
+                    />
+                  )}
+                  {(focusSpot || signingMode === 'compose') && (
+                    <div
+                      className="pointer-events-none absolute z-30 rounded-2xl border-2 border-ink-900/50 bg-ink-900/5 shadow-[0_0_0_9999px_rgba(255,255,255,0.18)]"
                       style={{
-                        left: `${(focusSpot.x / SHIRT_W) * 100}%`,
-                        top: `${(focusSpot.y / SHIRT_H) * 100}%`,
-                        width: `${(focusSpot.w / SHIRT_W) * 100}%`,
-                        height: `${(focusSpot.h / SHIRT_H) * 100}%`,
+                        left: `${((signingMode === 'compose' ? composeBox.x : focusSpot!.x) / SHIRT_W) * 100}%`,
+                        top: `${((signingMode === 'compose' ? composeBox.y : focusSpot!.y) / SHIRT_H) * 100}%`,
+                        width: `${((signingMode === 'compose' ? composeBox.w : focusSpot!.w) / SHIRT_W) * 100}%`,
+                        height: `${((signingMode === 'compose' ? composeBox.h : focusSpot!.h) / SHIRT_H) * 100}%`,
                       }}
                     >
                       <span className="absolute -top-7 left-0 rounded-full bg-ink-900 px-2 py-1 text-[10px] font-semibold text-white">
-                        {focusSpot.label}
+                        {signingMode === 'compose' ? 'composed note spot' : focusSpot!.label}
                       </span>
                     </div>
                   )}
-                  <DrawingCanvas
-                    ref={drawingRef}
-                    w={SHIRT_W}
-                    h={SHIRT_H}
-                    tool={tool}
-                    color={color}
-                    brushSize={brushSize}
-                    opacity={opacity}
-                    fillShapes={fillShapes}
-                    fontSize={fontSize}
-                    fontStyle={fontStyle}
-                    onStroke={handleLocalStroke}
-                  />
+                  {signingMode === 'direct' && (
+                    <DrawingCanvas
+                      key={draftKey}
+                      ref={drawingRef}
+                      w={SHIRT_W}
+                      h={SHIRT_H}
+                      tool={tool}
+                      color={color}
+                      brushSize={brushSize}
+                      opacity={opacity}
+                      fillShapes={fillShapes}
+                      fontSize={fontSize}
+                      fontStyle={fontStyle}
+                      onStroke={handleLocalStroke}
+                      initialJson={draftJson}
+                      clipPath={shirtTemplate.drawablePath}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -498,7 +656,9 @@ export default function ShirtView({
             )}
             {!error && mode === 'drawing' && (
               <p className="text-xs text-gray-500">
-                Zoom into the shirt, add your mark, then save it as one lightweight layer.
+                {signingMode === 'direct'
+                  ? 'Direct mode clips every stroke to the shirt SVG region.'
+                  : 'Compose mode saves your note as a placed layer inside the shirt region.'}
               </p>
             )}
           </div>
@@ -538,7 +698,7 @@ export default function ShirtView({
                 Cancel
               </button>
               <button
-                onClick={handleSaveDirect}
+                onClick={handleSaveScribble}
                 disabled={isSaving || !hasDrawing}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -552,7 +712,64 @@ export default function ShirtView({
 
       {mode === 'drawing' && (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+          <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => switchSigningMode('direct')}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-xs font-semibold transition',
+                  signingMode === 'direct'
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+                )}
+              >
+                Direct shirt draw
+              </button>
+              <button
+                onClick={() => switchSigningMode('compose')}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-xs font-semibold transition',
+                  signingMode === 'compose'
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+                )}
+              >
+                Compose then place
+              </button>
+              <span className="text-xs text-gray-500">
+                {signingMode === 'direct'
+                  ? 'Draw like a real shirt signing. The shirt clips the strokes.'
+                  : 'Tap the shirt to place this note, then save it.'}
+              </span>
+            </div>
+
+            {signingMode === 'compose' && (
+              <div className="grid gap-3 rounded-2xl border border-dashed border-black/15 bg-paper-100 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">Compose note</p>
+                  <p className="mt-1 text-xs text-gray-500">This scratch canvas becomes one movable shirt layer.</p>
+                </div>
+                <div className="h-[130px] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-inner">
+                  <DrawingCanvas
+                    key={draftKey}
+                    ref={drawingRef}
+                    w={COMPOSE_BOX_SIZE.w}
+                    h={COMPOSE_BOX_SIZE.h}
+                    tool={tool}
+                    color={color}
+                    brushSize={brushSize}
+                    opacity={opacity}
+                    fillShapes={fillShapes}
+                    fontSize={fontSize}
+                    fontStyle={fontStyle}
+                    onStroke={handleLocalStroke}
+                    initialJson={draftJson}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setTool(TOOL_TEXT)}
               className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
@@ -591,6 +808,17 @@ export default function ShirtView({
               Edge mark
             </button>
             <button
+              onClick={() => setShowAvatarInStudio(value => !value)}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-xs font-medium transition',
+                showAvatarInStudio
+                  ? 'border-ink-900 bg-ink-900 text-white hover:bg-ink-700'
+                  : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+              )}
+            >
+              {showAvatarInStudio ? 'Avatar visible' : 'Shirt only'}
+            </button>
+            <button
               onClick={() => {
                 drawingRef.current?.clear()
                 setHasDrawing(false)
@@ -601,6 +829,7 @@ export default function ShirtView({
               <RotateCcw size={14} />
               Reset mark
             </button>
+            </div>
           </div>
 
           <ScribbleToolbar
@@ -620,7 +849,7 @@ export default function ShirtView({
             onFontStyle={setFontStyle}
             onUndo={() => drawingRef.current?.undo()}
             onClear={() => drawingRef.current?.clear()}
-            onPlace={handleSaveDirect}
+            onPlace={handleSaveScribble}
             onEmoji={emoji => drawingRef.current?.addEmoji(emoji)}
             isPlacing={isSaving}
             canPlace={hasDrawing}

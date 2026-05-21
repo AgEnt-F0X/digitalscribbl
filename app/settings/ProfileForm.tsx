@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { BODY_STYLES, SHIRT_COLORS } from '@/lib/constants'
+import Avatar from '@/components/avatar/Avatar'
 import type { ShirtPermission } from '@/lib/supabase/types'
 
 interface Props {
   initial: {
     display_name:     string
     yearbook_quote:   string | null
+    thank_you_message: string | null
     shirt_permission: string
     body_style:       string
     shirt_color:      string
@@ -16,11 +18,14 @@ interface Props {
   }
 }
 
+// V1 surface area is two modes (doc 16 synthesis): the safe default
+// `batch_only` and the opt-in stricter `request_only`. The legacy `open`
+// and `locked` values still validate at the API so anyone with that value
+// from before keeps working — they just can't pick it again here.
+// "Locked" is exposed as the Pause-signing toggle further down.
 const PERMISSION_OPTIONS: { value: ShirtPermission; label: string; desc: string; emoji: string }[] = [
-  { value: 'open',         label: 'Open',         emoji: '🌐', desc: 'Anyone can scribble on your shirt' },
-  { value: 'batch_only',  label: 'Batchmates only', emoji: '🎓', desc: 'Only people from your batch' },
-  { value: 'request_only', label: 'Request only', emoji: '✉️',  desc: 'Approve each person manually' },
-  { value: 'locked',       label: 'Locked',        emoji: '🔒', desc: 'No new scribbles — read-only' },
+  { value: 'batch_only',   label: 'Batchmates',   emoji: '🎓', desc: 'Only people from your B.Tech CS batch can sign — the v1 default.' },
+  { value: 'request_only', label: 'Request only', emoji: '✉️',  desc: 'Approve each person manually before they can sign.' },
 ]
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
@@ -35,6 +40,7 @@ function Toast({ msg, ok }: { msg: string; ok: boolean }) {
 export default function ProfileForm({ initial }: Props) {
   const [displayName,     setDisplayName]     = useState(initial.display_name)
   const [yearbookQuote,   setYearbookQuote]   = useState(initial.yearbook_quote ?? '')
+  const [thankYouMessage, setThankYouMessage] = useState(initial.thank_you_message ?? '')
   const [permission,      setPermission]      = useState(initial.shirt_permission)
   const [bodyStyle,       setBodyStyle]       = useState(initial.body_style)
   const [shirtColor,      setShirtColor]      = useState(initial.shirt_color)
@@ -106,9 +112,27 @@ export default function ProfileForm({ initial }: Props) {
             />
             <p className="text-xs text-gray-400 mt-1 text-right">{yearbookQuote.length}/300</p>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Thank-you toast <span className="text-gray-400 font-normal">(shown after someone signs)</span>
+            </label>
+            <textarea
+              value={thankYouMessage}
+              onChange={e => setThankYouMessage(e.target.value)}
+              maxLength={180}
+              rows={3}
+              className="input w-full resize-none"
+              placeholder="Thanks for signing my shirt. This will stay with me."
+            />
+            <p className="text-xs text-gray-400 mt-1 text-right">{thankYouMessage.length}/180</p>
+          </div>
           <button
             disabled={isPending}
-            onClick={() => startTransition(() => save({ display_name: displayName, yearbook_quote: yearbookQuote }))}
+            onClick={() => startTransition(() => save({
+              display_name: displayName,
+              yearbook_quote: yearbookQuote,
+              thank_you_message: thankYouMessage,
+            }))}
             className="btn-primary text-sm"
           >
             {isPending ? 'Saving…' : 'Save profile'}
@@ -166,8 +190,10 @@ export default function ProfileForm({ initial }: Props) {
                   bodyStyle === b.id ? 'border-ink-900' : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.svgPath} alt={b.label} className="w-12 h-16 object-contain" />
+                <Avatar
+                  bodyStyle={b.id}
+                  size="sm"
+                />
                 <span className="text-[10px] text-gray-500 mt-1">{b.label}</span>
               </button>
             ))}
@@ -201,20 +227,25 @@ export default function ProfileForm({ initial }: Props) {
         </button>
       </section>
 
-      {/* ── Shirt lock ──────────────────────────────────────── */}
+      {/* ── Pause signing ───────────────────────────────────── */}
+      {/* Doc 16 synthesis disagreement D: replace the 4-mode picker's
+          `locked` option with this single toggle so the privacy panel only
+          chooses _who_, never _whether_. */}
       {initial.shirt_id && (
         <section className="card p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold text-ink-900">Shirt lock</h2>
+              <h2 className="text-base font-semibold text-ink-900">Pause signing</h2>
               <p className="text-xs text-gray-400 mt-1">
                 {shirtLocked
-                  ? 'Your shirt is locked — no one can add new scribbles.'
-                  : 'Your shirt is open — new scribbles are allowed (subject to your privacy setting).'}
+                  ? 'Signing is paused — your shirt is read-only for now. Flip back on whenever.'
+                  : 'Signing is on. Flip this off if you want the shirt to go read-only without changing your privacy.'}
               </p>
             </div>
             <button
               onClick={toggleShirtLock}
+              aria-label={shirtLocked ? 'Resume signing' : 'Pause signing'}
+              aria-pressed={shirtLocked}
               className={`flex-shrink-0 relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
                 shirtLocked ? 'bg-ink-900' : 'bg-gray-200'
               }`}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApiUser } from '@/lib/auth/server'
+import { getUserIsAdmin, requireApiUser } from '@/lib/auth/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getExportRequestType, normalizeExportRequestNote } from '@/lib/utils/exportAccess'
 
@@ -89,9 +89,8 @@ export async function PATCH(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { supabase, user } = auth
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { user } = auth
+  if (!(await getUserIsAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json().catch(() => null)
   const requestId = typeof body?.request_id === 'string' ? body.request_id : null
@@ -110,7 +109,8 @@ export async function PATCH(req: NextRequest) {
     resolved_by: status === 'pending' ? null : user.id,
   }
 
-  const { error } = await supabase.from('export_requests').update(update).eq('id', requestId)
+  const db = await createServiceClient()
+  const { error } = await db.from('export_requests').update(update).eq('id', requestId)
   if (error) return NextResponse.json({ error: 'Could not update request' }, { status: 500 })
 
   return NextResponse.json({ success: true })

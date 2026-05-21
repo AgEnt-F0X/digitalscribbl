@@ -1,16 +1,12 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requirePageUser } from '@/lib/auth/server'
+import { requirePageAdmin } from '@/lib/auth/server'
 import { ToggleScribbling, SetDeadline } from './AdminControls'
 import { ROUTES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const { supabase, user } = await requirePageUser()
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
+  const { adminDb: supabase } = await requirePageAdmin()
 
   // Dashboard metrics
   const [
@@ -41,7 +37,7 @@ export default async function AdminPage() {
   const totalModerationItems = (pendingReports ?? 0) + (pendingUserReports ?? 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       {/* Admin nav */}
       <nav className="bg-ink-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

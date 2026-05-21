@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { NotificationRow } from '@/lib/supabase/types'
 
 export function useNotifications(userId: string | null) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [notifications, setNotifications] = useState<NotificationRow[]>([])
   const [unreadCount, setUnreadCount]     = useState(0)
 
@@ -40,7 +40,7 @@ export function useNotifications(userId: string | null) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [userId])
+  }, [userId, supabase])
 
   const markAllRead = useCallback(async () => {
     if (!userId) return

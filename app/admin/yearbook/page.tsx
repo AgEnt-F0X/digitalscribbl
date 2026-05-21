@@ -1,7 +1,6 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requirePageUser } from '@/lib/auth/server'
-import AvatarDisplay from '@/components/avatar/AvatarDisplay'
+import { requirePageAdmin } from '@/lib/auth/server'
+import Avatar from '@/components/avatar/Avatar'
 import { ROUTES } from '@/lib/constants'
 import BatchSelect from './BatchSelect'
 import ExportRequestActions from './ExportRequestActions'
@@ -13,11 +12,8 @@ interface Props {
 }
 
 export default async function AdminYearbookPage({ searchParams }: Props) {
-  const { supabase, user } = await requirePageUser()
+  const { adminDb: supabase } = await requirePageAdmin()
   const filters = await searchParams
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
 
   // Fetch all batches for the dropdown
   const { data: batches } = await supabase
@@ -31,7 +27,7 @@ export default async function AdminYearbookPage({ searchParams }: Props) {
   let usersQ = supabase
     .from('users')
     .select(`
-      id, display_name, body_style, shirt_color, head_front_url,
+      id, display_name, body_style, shirt_color, head_front_url, avatar_config,
       yearbook_quote, email, batch_id,
       batches(label, graduation_year, programs(name))
     `)
@@ -104,7 +100,7 @@ export default async function AdminYearbookPage({ searchParams }: Props) {
   const requestGroupMap = new Map((requestGroups ?? []).map(g => [g.id, g]))
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       {/* Admin nav */}
       <nav className="bg-ink-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -335,10 +331,9 @@ export default async function AdminYearbookPage({ searchParams }: Props) {
                       target="_blank"
                       className="group flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 hover:shadow-md transition flex-1"
                     >
-                      <AvatarDisplay
-                        bodyStyle={u.body_style}
-                        shirtColor={u.shirt_color}
-                        headFrontUrl={u.head_front_url}
+                      <Avatar
+                        row={u}
+                        displayName={u.display_name}
                         scribbleCount={scribbles}
                         size="sm"
                         className="mx-auto group-hover:scale-105 transition-transform"

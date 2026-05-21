@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 828 1474" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched campus lawn at golden hour (mobile portrait placeholder)">
+  <defs>
+    <linearGradient id="sky-m" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe6b3"/>
+      <stop offset="45%" stop-color="#fbd498"/>
+      <stop offset="100%" stop-color="#f4ba79"/>
+    </linearGradient>
+    <radialGradient id="sun-m" cx="0.78" cy="0.18" r="0.45">
+      <stop offset="0%" stop-color="#fff3d1" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#ffdca0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#fbd498" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lawn-m" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b9c277"/>
+      <stop offset="100%" stop-color="#86934f"/>
+    </linearGradient>
+  </defs>
+  <rect width="828" height="1474" fill="url(#sky-m)"/>
+  <rect width="828" height="1474" fill="url(#sun-m)"/>
+  <path d="M0 900 C 200 850 460 880 660 860 C 740 850 800 860 828 870 L 828 1474 L 0 1474 Z" fill="url(#lawn-m)"/>
+  <path d="M0 900 C 200 850 460 880 660 860 C 740 850 800 860 828 870" fill="none" stroke="#5e6a36" stroke-width="2" opacity="0.55" stroke-linecap="round"/>
+  <g opacity="0.45" stroke="#5e6a36" stroke-width="2" stroke-linecap="round">
+    <path d="M60 1020 l4 -14"/>
+    <path d="M160 1100 l4 -14"/>
+    <path d="M240 1040 l4 -14"/>
+    <path d="M340 1140 l4 -14"/>
+    <path d="M440 1060 l4 -14"/>
+    <path d="M540 1180 l4 -14"/>
+    <path d="M640 1080 l4 -14"/>
+    <path d="M740 1160 l4 -14"/>
+    <path d="M120 1220 l4 -14"/>
+    <path d="M300 1280 l4 -14"/>
+    <path d="M500 1240 l4 -14"/>
+    <path d="M680 1300 l4 -14"/>
+  </g>
+  <g opacity="0.6">
+    <ellipse cx="540" cy="760" rx="160" ry="120" fill="#8aa15c"/>
+    <ellipse cx="500" cy="720" rx="110" ry="86" fill="#9bb16c"/>
+    <ellipse cx="610" cy="730" rx="100" ry="74" fill="#7e9355"/>
+    <path d="M540 900 v-110" stroke="#5b4524" stroke-width="14" stroke-linecap="round"/>
+    <path d="M528 820 c -10 16 -12 40 0 64" stroke="#5b4524" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.32">
+    <ellipse cx="180" cy="820" rx="84" ry="62" fill="#a3b56a"/>
+    <ellipse cx="206" cy="800" rx="60" ry="48" fill="#b6c277"/>
+    <path d="M196 900 v-66" stroke="#5b4524" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -6,6 +6,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { ArrowUpRight, MessageCircleHeart } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { REACTION_EMOJIS, type ReactionEmoji } from '@/lib/utils/reactions'
+import { createActionCooldown } from '@/lib/utils/actionCooldown'
+import { showToast } from '@/lib/hooks/useToast'
 import type { ActivityItem } from '@/lib/utils/activity'
 
 interface ActivityLogProps {
@@ -43,12 +45,14 @@ export function ActivityLog({
   }, [items])
   const [reactions, setReactions] = useState<LocalReactionState>(initial)
   const [pendingId, startTransition] = useTransition()
+  const cooldown = useMemo(() => createActionCooldown({ cooldownMs: 700 }), [])
 
   useEffect(() => {
     setReactions(initial)
   }, [initial])
 
   function toggleReaction(itemId: string, emoji: ReactionEmoji) {
+    if (!cooldown.canRun(`reaction:${itemId}:${emoji}`)) return
     const previous = reactions
     const current = previous[itemId]
     if (!current) return
@@ -80,6 +84,7 @@ export function ActivityLog({
         if (!response.ok) throw new Error('reaction failed')
       } catch {
         setReactions(previous)
+        showToast({ tone: 'error', title: 'Reaction failed', body: 'Try again in a moment.' })
       }
     })
   }
@@ -87,12 +92,12 @@ export function ActivityLog({
   return (
     <section className={cn('space-y-4', className)}>
       <div>
-        <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400">{eyebrow}</p>
-        <h2 className="font-display text-2xl font-bold text-ink-900">{title}</h2>
+        <p className="text-eyebrow-uppercase">{eyebrow}</p>
+        <h2 className="text-eyebrow-display mt-1">{title}</h2>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-cream-50/60 p-5 text-sm text-gray-500">
+        <div className="rounded-xl border border-dashed border-gray-200 bg-paper-100/60 p-5 text-sm text-gray-500">
           {emptyText}
         </div>
       ) : (
@@ -110,7 +115,7 @@ export function ActivityLog({
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-gray-100 bg-cream-50"
+                    className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg border border-gray-100 bg-paper-100"
                     aria-hidden="true"
                   >
                     {item.canvasSvg ? (

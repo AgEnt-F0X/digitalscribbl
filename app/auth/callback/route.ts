@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAccountKind, getAllowedEmailDomains } from '@/lib/utils/safetyAccess'
+import { getPlatformFlags } from '@/lib/utils/platformFlags'
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url)
@@ -34,11 +35,25 @@ export async function GET(req: NextRequest) {
   // Upsert user row (first sign-in creates the record)
   const { data: existingUser } = await db
     .from('users')
-    .select('id, onboarding_completed, is_university_verified')
+    .select('id, onboarding_completed, is_university_verified, is_guest, is_deleted')
     .eq('id', user.id)
     .maybeSingle()
 
+  // Soft-deleted accounts: refuse the session even though Google handed us
+  // a valid token. proxy.ts catches them on page nav too, but doing it here
+  // closes the gap where a deleted user re-logs in to revive their data.
+  if (existingUser?.is_deleted) {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(`${origin}/login?reason=deleted`)
+  }
+
   if (!existingUser) {
+    const flags = await getPlatformFlags(db)
+    if (flags.disable_new_signups) {
+      await supabase.auth.signOut()
+      return NextResponse.redirect(`${origin}/login?reason=signups_closed`)
+    }
+
     const { error: insertError } = await db.from('users').insert({
       id:           user.id,
       email:        user.email,
@@ -46,6 +61,7 @@ export async function GET(req: NextRequest) {
       onboarding_completed: !isUniversity,
       shirt_permission: isUniversity ? 'open' : 'locked',
       is_university_verified: isUniversity,
+      is_guest: !isUniversity,
     })
 
     if (insertError) {
@@ -58,16 +74,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${origin}/onboarding`)
     }
 
-    return NextResponse.redirect(`${origin}/dashboard`)
+    return NextResponse.redirect(`${origin}/onboarding/guest`)
   }
+
+  const profileUpdates: {
+    last_seen: string
+    is_university_verified: boolean
+    is_guest: boolean
+    shirt_permission?: string
+  } = {
+    last_seen: new Date().toISOString(),
+    is_university_verified: isUniversity,
+    is_guest: !isUniversity,
+  }
+  if (!isUniversity) profileUpdates.shirt_permission = 'locked'
 
   await db
     .from('users')
-    .update({
-      last_seen: new Date().toISOString(),
-      is_university_verified: isUniversity,
-    })
+    .update(profileUpdates)
     .eq('id', user.id)
+
+  if (!isUniversity) {
+    return NextResponse.redirect(`${origin}/onboarding/guest`)
+  }
 
   if (isUniversity && !existingUser.onboarding_completed) {
     return NextResponse.redirect(`${origin}/onboarding`)

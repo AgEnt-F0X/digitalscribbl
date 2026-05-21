@@ -18,9 +18,13 @@ test('dev auth bypass requires both flag and user id', () => {
 })
 
 test('dev auth bypass accepts true-like values', () => {
-  assert.equal(isDevAuthBypassEnabled({ DEV_AUTH_BYPASS: 'true', DEV_AUTH_USER_ID: 'user-1' }), true)
-  assert.equal(isDevAuthBypassEnabled({ DEV_AUTH_BYPASS: '1', DEV_AUTH_USER_ID: 'user-1' }), true)
-  assert.equal(isDevAuthBypassEnabled({ DEV_AUTH_BYPASS: 'yes', DEV_AUTH_USER_ID: 'user-1' }), true)
+  assert.equal(isDevAuthBypassEnabled({ NODE_ENV: 'development', DEV_AUTH_BYPASS: 'true', DEV_AUTH_USER_ID: 'user-1' }), true)
+  assert.equal(isDevAuthBypassEnabled({ NODE_ENV: 'development', DEV_AUTH_BYPASS: '1', DEV_AUTH_USER_ID: 'user-1' }), true)
+  assert.equal(isDevAuthBypassEnabled({ NODE_ENV: 'development', DEV_AUTH_BYPASS: 'yes', DEV_AUTH_USER_ID: 'user-1' }), true)
+})
+
+test('dev auth bypass is hard-disabled in production', () => {
+  assert.equal(isDevAuthBypassEnabled({ NODE_ENV: 'production', DEV_AUTH_BYPASS: 'true', DEV_AUTH_USER_ID: 'user-1' }), false)
 })
 
 test('getDevAuthUserId trims and returns empty when unset', () => {

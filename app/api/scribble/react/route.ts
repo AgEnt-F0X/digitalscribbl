@@ -2,12 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireApiUser } from '@/lib/auth/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getReactionEmoji } from '@/lib/utils/reactions'
+import { createFixedWindowRateLimiter, rateLimitResponseHeaders } from '@/lib/utils/rateLimit'
 
 export const runtime = 'nodejs'
+
+const reactionLimiter = createFixedWindowRateLimiter({ limit: 45, windowMs: 60_000 })
 
 export async function POST(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const rate = reactionLimiter.check(auth.user.id)
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many reactions. Wait a moment and try again.' },
+      { status: 429, headers: rateLimitResponseHeaders(rate) },
+    )
+  }
 
   const body = await req.json().catch(() => null)
   const scribbleId = typeof body?.scribble_id === 'string' ? body.scribble_id : null

@@ -46,12 +46,23 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
     }
   }
 
+  // Resolve the trigger label dynamically so screen readers announce
+  // unread state without the user opening the panel. `useNotifications`
+  // streams `unreadCount` asynchronously; the initial value is `0` and
+  // any later update flips the label automatically.
+  const bellLabel =
+    unreadCount > 0
+      ? `Notifications, ${unreadCount} unread`
+      : 'Notifications, no unread'
+
   return (
     <div className="relative">
       <button
         onClick={handleToggle}
         className="relative p-2 rounded-full hover:bg-gray-100 transition"
-        aria-label="Notifications"
+        aria-label={bellLabel}
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
         🔔
         {unreadCount > 0 && (
@@ -95,7 +106,7 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
                       onClick={() => !isRequest && markRead(n.id)}
                       className={cn(
                         'px-4 py-3 transition',
-                        !n.is_read && 'bg-cream-50',
+                        !n.is_read && 'bg-paper-100',
                         !isRequest && 'cursor-pointer hover:bg-gray-50',
                       )}
                     >

@@ -1,14 +1,10 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requirePageUser } from '@/lib/auth/server'
+import { requirePageAdmin } from '@/lib/auth/server'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminErrorsPage() {
-  const { supabase, user } = await requirePageUser()
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
+  const { adminDb: supabase } = await requirePageAdmin()
 
   const { data: logs } = await supabase
     .from('error_logs')
@@ -23,7 +19,7 @@ export default async function AdminErrorsPage() {
   const userMap = new Map((users ?? []).map(u => [u.id, u]))
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       <nav className="bg-ink-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="font-display font-bold text-lg">scribbl</Link>

@@ -1,20 +1,46 @@
 import { cn } from '@/lib/utils/cn'
 
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-xl bg-gray-200/70', className)} />
+interface SkeletonProps {
+  className?: string
+  variant?: 'line' | 'circle' | 'rect' | 'card'
 }
 
-export function PageShellSkeleton({ children }: { children: React.ReactNode }) {
+export function Skeleton({ className, variant = 'rect' }: SkeletonProps) {
+  const variants = {
+    line:   'h-3 rounded-full',
+    circle: 'rounded-full',
+    rect:   'rounded-xl',
+    card:   'rounded-2xl',
+  } as const
+
   return (
-    <div className="min-h-screen bg-cream-50">
-      <nav className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-100 bg-white/80 px-4 py-3 backdrop-blur">
-        <Skeleton className="h-6 w-24" />
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-9 w-9 rounded-full" />
-        </div>
-      </nav>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">{children}</main>
+    <div
+      className={cn('paper-skeleton', variants[variant], className)}
+      aria-hidden="true"
+    />
+  )
+}
+
+export function SkeletonText({ lines = 3, className }: { lines?: number; className?: string }) {
+  return (
+    <div className={cn('flex flex-col gap-2', className)} aria-hidden="true">
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton
+          key={i}
+          variant="line"
+          className={cn('h-3', i === lines - 1 ? 'w-2/3' : 'w-full')}
+        />
+      ))}
     </div>
+  )
+}
+
+export function PageShellSkeleton({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <main className={cn('min-h-screen bg-paper-100 px-4 py-6 sm:px-6 lg:px-8', className)}>
+      <div className="mx-auto max-w-7xl">
+        {children}
+      </div>
+    </main>
   )
 }

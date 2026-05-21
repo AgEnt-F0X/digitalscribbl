@@ -23,7 +23,7 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <main className="grid min-h-screen place-items-center bg-cream-50 px-4">
+    <main className="grid min-h-screen place-items-center bg-paper-100 px-4">
       <section className="max-w-md rounded-2xl border border-red-100 bg-white p-6 text-center shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-500">Something broke</p>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink-900">Try that again</h1>

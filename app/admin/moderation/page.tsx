@@ -1,15 +1,11 @@
-import { redirect } from 'next/navigation'
-import { requirePageUser } from '@/lib/auth/server'
+import { requirePageAdmin } from '@/lib/auth/server'
 import ModerationAction from './ModerationAction'
 import UserReportAction from './UserReportAction'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ModerationPage() {
-  const { supabase, user } = await requirePageUser()
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
+  const { adminDb: supabase } = await requirePageAdmin()
 
   const { data: flagged } = await supabase
     .from('scribbles')
@@ -34,7 +30,7 @@ export default async function ModerationPage() {
     .limit(50)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Moderation queue</h1>
 

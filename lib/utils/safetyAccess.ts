@@ -19,6 +19,15 @@ export function getAccountKind(email: string | null | undefined, allowedDomains:
   return isAllowedEmailDomain(email, allowedDomains) ? 'university' : 'external'
 }
 
+/**
+ * Decides whether a viewer should be allowed to attempt placing a scribble.
+ *
+ * v1 surface area is two modes — `batch_only` and `request_only` — chosen
+ * via the settings UI. `open` and `locked` are LEGACY values: anyone with
+ * `open` saved from an older flow keeps the open behaviour until they re-
+ * save; `locked` is the same outcome as toggling Pause-signing (now the
+ * actual UI for that intent). Doc 16 synthesis disagreement D.
+ */
 export function canAttemptScribble({
   isOwner,
   permission,

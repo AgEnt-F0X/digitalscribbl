@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 832" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched classroom hall (tablet placeholder)">
+  <defs>
+    <linearGradient id="wall-ct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff1cf"/>
+      <stop offset="60%" stop-color="#f5dfaa"/>
+      <stop offset="100%" stop-color="#e8c890"/>
+    </linearGradient>
+    <linearGradient id="floor-ct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d6b985"/>
+      <stop offset="100%" stop-color="#a98c5b"/>
+    </linearGradient>
+    <radialGradient id="window-ct" cx="0.5" cy="0.45" r="0.5">
+      <stop offset="0%" stop-color="#fff6d9" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#fff6d9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="832" fill="url(#wall-ct)"/>
+  <path d="M0 560 L 1280 560 L 1280 832 L 0 832 Z" fill="url(#floor-ct)"/>
+  <path d="M0 0 L 640 360 L 1280 0 Z" fill="#f8e6b7" opacity="0.55"/>
+  <g stroke="#7a6238" stroke-width="2" fill="none" opacity="0.65">
+    <path d="M0 0 L 640 360" stroke-linecap="round"/>
+    <path d="M1280 0 L 640 360" stroke-linecap="round"/>
+    <path d="M0 560 L 640 360" stroke-linecap="round"/>
+    <path d="M1280 560 L 640 360" stroke-linecap="round"/>
+  </g>
+  <g stroke="#7a6238" stroke-width="1.6" fill="none" opacity="0.42">
+    <path d="M0 832 L 640 360"/>
+    <path d="M1280 832 L 640 360"/>
+    <path d="M320 832 L 640 360"/>
+    <path d="M960 832 L 640 360"/>
+  </g>
+  <g opacity="0.7">
+    <rect x="490" y="280" width="300" height="160" fill="#fbf8ee" stroke="#8a93a0" stroke-width="5" rx="4"/>
+    <rect x="506" y="296" width="268" height="128" fill="url(#window-ct)"/>
+    <path d="M510 380 q 60 -22 110 -8 t 160 -12" stroke="#2563eb" stroke-width="2.6" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+  <g opacity="0.55" stroke="#5b4524" stroke-width="2.4" fill="#e6cf9a">
+    <rect x="120" y="560" width="200" height="90" rx="6"/>
+    <rect x="120" y="560" width="200" height="28" rx="6" fill="#caa56a"/>
+    <line x1="128" y1="650" x2="128" y2="730" stroke-width="5" stroke-linecap="round"/>
+    <line x1="312" y1="650" x2="312" y2="730" stroke-width="5" stroke-linecap="round"/>
+    <rect x="960" y="560" width="200" height="90" rx="6"/>
+    <rect x="960" y="560" width="200" height="28" rx="6" fill="#caa56a"/>
+    <line x1="968" y1="650" x2="968" y2="730" stroke-width="5" stroke-linecap="round"/>
+    <line x1="1152" y1="650" x2="1152" y2="730" stroke-width="5" stroke-linecap="round"/>
+    <rect x="430" y="572" width="180" height="76" rx="6"/>
+    <rect x="670" y="572" width="180" height="76" rx="6"/>
+  </g>
+</svg>

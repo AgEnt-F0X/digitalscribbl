@@ -17,7 +17,10 @@ export async function GET(
     return NextResponse.json({ error: 'Unknown dev user slot' }, { status: 404 })
   }
 
-  const nextPath = request.nextUrl.searchParams.get('next') || '/dashboard'
+  const rawNextPath = request.nextUrl.searchParams.get('next') || '/dashboard'
+  const nextPath = rawNextPath.startsWith('/') && !rawNextPath.startsWith('//') && !rawNextPath.startsWith('/api/')
+    ? rawNextPath
+    : '/dashboard'
   const targetUrl = new URL(nextPath, request.url)
   const response = NextResponse.redirect(targetUrl)
 

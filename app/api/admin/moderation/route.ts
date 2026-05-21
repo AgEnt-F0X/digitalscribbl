@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireApiUser } from '@/lib/auth/server'
+import { getUserIsAdmin, requireApiUser } from '@/lib/auth/server'
 import { calculateOccupancy } from '@/lib/utils/collision'
+import { writeAdminAuditLog } from '@/lib/utils/audit'
 import { SHIRT_W, SHIRT_H } from '@/lib/constants'
 import type { Panel } from '@/lib/supabase/types'
 
@@ -19,10 +20,9 @@ function panelOccupancyKey(panel: Panel) {
 export async function POST(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { supabase, user } = auth
+  const { user } = auth
 
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await getUserIsAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { scribble_id, action } = await req.json()
   if (!scribble_id || !action) {
@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
     await db.from('scribbles')
       .update({ is_flagged: false, flag_count: 0, is_hidden: false })
       .eq('id', scribble_id)
+    await writeAdminAuditLog(db, {
+      actor_user_id: user.id,
+      action: 'scribble_unhidden',
+      target_kind: 'scribble',
+      target_id: scribble_id,
+      details: { reason: 'flag_dismissed' },
+    })
     return NextResponse.json({ success: true })
   }
 
@@ -64,6 +71,14 @@ export async function POST(req: NextRequest) {
         .eq('id', scribble.shirt_id)
     }
 
+    await writeAdminAuditLog(db, {
+      actor_user_id: user.id,
+      action: action === 'remove' ? 'scribble_removed' : 'scribble_hidden',
+      target_kind: 'scribble',
+      target_id: scribble_id,
+      details: { shirt_id: scribble?.shirt_id ?? null, panel: scribble?.panel ?? null },
+    })
+
     return NextResponse.json({ success: true })
   }
 
@@ -73,10 +88,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { supabase, user } = auth
+  const { user } = auth
 
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await getUserIsAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { report_id, action } = await req.json().catch(() => ({}))
   if (!report_id || !['dismiss', 'suspend'].includes(action)) {
@@ -94,6 +108,13 @@ export async function PATCH(req: NextRequest) {
 
   if (action === 'suspend') {
     await db.from('users').update({ is_suspended: true }).eq('id', report.reported_user_id)
+    await writeAdminAuditLog(db, {
+      actor_user_id: user.id,
+      action: 'user_suspended',
+      target_kind: 'user',
+      target_id: report.reported_user_id,
+      details: { via_report: report_id },
+    })
   }
 
   const { error } = await db
@@ -106,5 +127,14 @@ export async function PATCH(req: NextRequest) {
     .eq('id', report_id)
 
   if (error) return NextResponse.json({ error: 'Could not update report' }, { status: 500 })
+
+  await writeAdminAuditLog(db, {
+    actor_user_id: user.id,
+    action: action === 'suspend' ? 'report_actioned' : 'report_dismissed',
+    target_kind: 'report',
+    target_id: report_id,
+    details: { action },
+  })
+
   return NextResponse.json({ success: true })
 }
