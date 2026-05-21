@@ -1,127 +1,224 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { BODY_STYLES, SHIRT_COLORS } from '@/lib/constants'
-import AvatarDisplay from '@/components/avatar/AvatarDisplay'
+import Avatar from '@/components/avatar/Avatar'
+import HeadCropUpload from '@/components/avatar/HeadCropUpload'
+import Whiteboard from '@/components/brand/Whiteboard'
+import InkUnderline from '@/components/forms/InkUnderline'
 import { cn } from '@/lib/utils/cn'
+import { HERO_PRESETS } from '@/lib/utils/avatarResolve'
+import type { AvatarPresetId } from '@/src/features/avatar/types'
+import {
+  DEFAULT_SKIN_DEPTH,
+  DEFAULT_SKIN_UNDERTONE,
+  SKIN_TONE_ANCHORS,
+  skinToneFrom,
+} from '@/lib/utils/skinTone'
 
-type Step = 1 | 2 | 3
+// Onboarding (doc 08 §10 + doc 16 synthesis + Round 3 PM cleanup +
+// Route 1 avatar lock-in):
+//   Step 1 — Basics (name + enrollment + batch grid). Sunlit Lawn round 6
+//            opens with an a-frame Whiteboard greeting (doc 18 § 3).
+//   Step 2 — Face (AI prompt + upload OR skip — no placeholder bank;
+//            customised faces are core to the product identity)
+//   Step 3 — Body pose (HERO_PRESETS grid) + skin (depth + undertone).
+//            Shirt colour is gone — Route 1 ships one canonical white
+//            shirt as the scribbling surface.
+//   Step 4 — Review (with Edit jumps + confetti once, at the end)
+//
+// Inputs across every step use the doc 18 § 14 InkUnderline wave; CTAs
+// use the pencil-button family so the school-physics hover applies.
+
+type Step = 1 | 2 | 3 | 4
+type FieldKey = 'displayName' | 'enrollmentNumber'
 
 interface FormState {
-  displayName:     string
+  displayName:      string
   enrollmentNumber: string
-  academicGroupId: string
-  programId:       string
-  batchId:         string
-  bodyStyle:       string
-  shirtColor:      string
-  headFrontUrl:    string | null
-  headBackUrl:     string | null
+  batchId:          string         // resolved from grid click
+  batchNumber:      number | null  // 1..52
+  presetId:         AvatarPresetId // Route 1 canonical avatar identity
+  bodyStyle:        string         // legacy back-compat; derived from presetId
+  skinDepth:        number         // 0..100  (lightness)
+  skinUndertone:    number         // -50..50 (cool ↔ warm)
+  headFrontUrl:     string | null
+  headBackUrl:      string | null
+  headSource:       'upload' | 'skipped'
 }
+
+interface BatchOption {
+  id:    string
+  label: string
+  batchNumber: number
+}
+
+const AI_PROMPT = `A simple cartoon-style head-and-shoulders portrait of me, front view, looking at the camera, plain background, transparent PNG, no shirt, no shoulders below the collarbone, soft outlines, friendly expression — designed to be cropped into a yearbook avatar.`
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [step, setStep]   = useState<Step>(1)
   const [userId, setUserId] = useState<string | null>(null)
   const [form, setForm]   = useState<FormState>({
     displayName:      '',
     enrollmentNumber: '',
-    academicGroupId:  '',
-    programId:        '',
     batchId:          '',
-    bodyStyle:        'M1',
-    shirtColor:       '#F8F8F8',
+    batchNumber:      null,
+    presetId:         'm-classic-straight',
+    bodyStyle:        'M2',
+    skinDepth:        DEFAULT_SKIN_DEPTH,
+    skinUndertone:    DEFAULT_SKIN_UNDERTONE,
     headFrontUrl:     null,
     headBackUrl:      null,
+    headSource:       'skipped',
   })
-  const [groups, setGroups]     = useState<{ id: string; name: string }[]>([])
-  const [programs, setPrograms] = useState<{ id: string; name: string }[]>([])
-  const [batches, setBatches]   = useState<{ id: string; label: string | null; graduation_year: number }[]>([])
+  const [academicGroupId, setAcademicGroupId] = useState<string | null>(null)
+  const [programId, setProgramId] = useState<string | null>(null)
+  const [batches, setBatches]   = useState<BatchOption[]>([])
   const [saving, setSaving]     = useState(false)
-  const [uploadingHead, setUploadingHead] = useState<'front' | 'back' | null>(null)
   const [error, setError]       = useState<string | null>(null)
+  const [promptCopied, setPromptCopied] = useState(false)
+  const [focused, setFocused] = useState<FieldKey | null>(null)
 
-  // ── Load user + academic structure ────────────────────────
+  // ── Load user + B.Tech CS batches ─────────────────────────
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    let cancelled = false
+
+    async function bootstrap() {
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
+      const sync = await fetch('/api/auth/sync-user', { method: 'POST' })
+        .then(res => res.json())
+        .catch(() => null)
+      if (sync?.account_kind === 'external') {
+        router.push('/onboarding/guest')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('is_university_verified')
+        .eq('id', user.id)
+        .single()
+      if (profile && !profile.is_university_verified) {
+        router.push('/onboarding/guest')
+        return
+      }
+
+      if (cancelled) return
       setUserId(user.id)
       setForm(f => ({
         ...f,
         displayName: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? '',
       }))
-    })
+    }
 
-    supabase.from('academic_groups').select('id, name').order('name').then(({ data }) => {
-      setGroups(data ?? [])
-    })
-  }, [])
+    async function loadBatches() {
+      const { data: group } = await supabase
+        .from('academic_groups')
+        .select('id')
+        .eq('name', 'University')
+        .maybeSingle()
+      if (!group) return
 
-  // Load programs when group changes
-  useEffect(() => {
-    if (!form.academicGroupId) { setPrograms([]); setBatches([]); return }
-    supabase.from('programs')
-      .select('id, name')
-      .eq('academic_group_id', form.academicGroupId)
-      .order('name')
-      .then(({ data }) => setPrograms(data ?? []))
-    setForm(f => ({ ...f, programId: '', batchId: '' }))
-  }, [form.academicGroupId])
+      const { data: program } = await supabase
+        .from('programs')
+        .select('id')
+        .eq('academic_group_id', group.id)
+        .eq('name', 'B.Tech Computer Science')
+        .maybeSingle()
+      if (!program) return
 
-  // Load batches when program changes
-  useEffect(() => {
-    if (!form.programId) { setBatches([]); return }
-    supabase.from('batches')
-      .select('id, label, graduation_year')
-      .eq('program_id', form.programId)
-      .order('graduation_year', { ascending: false })
-      .then(({ data }) => setBatches(data ?? []))
-    setForm(f => ({ ...f, batchId: '' }))
-  }, [form.programId])
+      const { data: batchRows } = await supabase
+        .from('batches')
+        .select('id, label')
+        .eq('program_id', program.id)
+        .order('label')
 
-  const set = (k: keyof FormState, v: string | null) =>
+      if (cancelled) return
+      setAcademicGroupId(group.id)
+      setProgramId(program.id)
+      setBatches(
+        (batchRows ?? [])
+          .map(b => ({
+            id: b.id,
+            label: b.label ?? '',
+            batchNumber: parseInt((b.label ?? '').replace(/\D/g, ''), 10) || 0,
+          }))
+          .filter(b => b.batchNumber > 0)
+          .sort((a, b) => a.batchNumber - b.batchNumber),
+      )
+    }
+
+    bootstrap()
+    loadBatches()
+
+    return () => { cancelled = true }
+  }, [router, supabase])
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm(f => ({ ...f, [k]: v }))
 
-  // ── Head upload ───────────────────────────────────────────
-  const uploadHead = async (file: File, side: 'front' | 'back') => {
-    setUploadingHead(side)
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('side', side)
-    const res = await fetch('/api/avatar/upload-head', { method: 'POST', body: fd })
-    if (res.ok) {
-      const { url } = await res.json()
-      set(side === 'front' ? 'headFrontUrl' : 'headBackUrl', url)
+  // ── Step gating ───────────────────────────────────────────
+  const canProceed1 =
+    form.displayName.trim().length > 0 &&
+    form.enrollmentNumber.trim().length > 0 &&
+    !!form.batchId
+  const canProceed2 = true
+  const canProceed3 = !!form.presetId
+
+  const next = () => setStep(s => (Math.min(4, s + 1)) as Step)
+  const back = () => setStep(s => (Math.max(1, s - 1)) as Step)
+  const goTo = (s: Step) => setStep(s)
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(AI_PROMPT)
+      setPromptCopied(true)
+      setTimeout(() => setPromptCopied(false), 2500)
+    } catch {
+      /* clipboard refused — surface nothing, the user can select+copy by hand */
     }
-    setUploadingHead(null)
   }
 
-  // ── Step navigation ───────────────────────────────────────
-  const canProceed1 = form.displayName.trim() && form.enrollmentNumber.trim() &&
-    form.academicGroupId && form.programId && form.batchId
+  function clearFace() {
+    set('headFrontUrl', null)
+    set('headBackUrl', null)
+    set('headSource', 'skipped')
+  }
 
-  const next = () => setStep(s => (s + 1) as Step)
-
-  // ── Save & complete ───────────────────────────────────────
+  // ── Save ──────────────────────────────────────────────────
   const complete = async () => {
-    if (!userId) return
+    if (!userId || !academicGroupId || !programId) return
     setSaving(true)
     setError(null)
 
+    const resolvedSkin = skinToneFrom(form.skinDepth, form.skinUndertone)
+    const legacyBodyStyle = form.presetId.startsWith('m-') ? 'M2' : 'F1'
+
     const { error: err } = await supabase.from('users').update({
-      display_name:       form.displayName.trim(),
-      enrollment_number:  form.enrollmentNumber.trim(),
-      academic_group_id:  form.academicGroupId,
-      program_id:         form.programId,
-      batch_id:           form.batchId,
-      body_style:         form.bodyStyle as FormState['bodyStyle'],
-      shirt_color:        form.shirtColor,
-      head_front_url:     form.headFrontUrl,
-      head_back_url:      form.headBackUrl,
+      display_name:      form.displayName.trim(),
+      enrollment_number: form.enrollmentNumber.trim(),
+      academic_group_id: academicGroupId,
+      program_id:        programId,
+      batch_id:          form.batchId,
+      body_style:        legacyBodyStyle,
+      head_front_url:    form.headFrontUrl,
+      head_back_url:     form.headBackUrl,
+      avatar_config:     {
+        presetId: form.presetId,
+        skinTone: {
+          mode:      'slider-v2',
+          depth:     resolvedSkin.depth,
+          undertone: resolvedSkin.undertone,
+          hex:       resolvedSkin.hex,
+        },
+        headSource: form.headSource,
+      },
       onboarding_completed: true,
     }).eq('id', userId)
 
@@ -131,7 +228,6 @@ export default function OnboardingPage() {
       return
     }
 
-    // 🎉 Confetti!
     try {
       const confetti = (await import('canvas-confetti')).default
       confetti({
@@ -142,77 +238,138 @@ export default function OnboardingPage() {
       })
     } catch { /* non-critical */ }
 
-    router.push('/dashboard?new=1')
+    router.push('/dashboard?onboarded=1')
   }
+
+  const skin = skinToneFrom(form.skinDepth, form.skinUndertone)
+  const depthTrack = `linear-gradient(to right, ${SKIN_TONE_ANCHORS.map(a => a.hex).join(', ')})`
+  const undertoneSamples = [-50, -25, 0, 25, 50].map(u => skinToneFrom(form.skinDepth, u).hex)
+  const undertoneTrack = `linear-gradient(to right, ${undertoneSamples.join(', ')})`
+
+  // First-name fallback for the welcome whiteboard. Empty value uses
+  // "friend" so the greeting reads naturally before the field is filled.
+  const firstName = (form.displayName.trim().split(/\s+/)[0] ?? '').trim() || 'friend'
+
+  const displayNameActive    = focused === 'displayName'    || form.displayName.length > 0
+  const enrollmentActive     = focused === 'enrollmentNumber' || form.enrollmentNumber.length > 0
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-cream-50 py-10 px-4">
+    <div className="scribbl-page min-h-screen py-10 px-4">
       <div className="max-w-lg mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-display font-bold text-ink-900">scribbl</h1>
-          <p className="text-gray-500 text-sm mt-1">Set up your scribble shirt 🎽</p>
+          <h1 className="text-hero-display">scribbl</h1>
+          <p className="text-nostalgia mt-1">Set up your scribble shirt</p>
         </div>
 
-        {/* Progress */}
-        <div className="flex gap-2 mb-8">
-          {[1, 2, 3].map(s => (
+        <div className="flex gap-2 mb-8" aria-label={`Step ${step} of 4`}>
+          {[1, 2, 3, 4].map(s => (
             <div key={s} className={cn(
               'flex-1 h-1.5 rounded-full transition-all duration-500',
-              s <= step ? 'bg-ink-900' : 'bg-gray-200'
+              s <= step ? 'bg-ink-900' : 'bg-paper-300',
             )} />
           ))}
         </div>
 
-        {/* ── Step 1 — Profile ── */}
+        {/* ── Step 1 — Basics ── */}
         {step === 1 && (
-          <div className="card p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-ink-900">Your profile</h2>
+          <div className="card p-6 space-y-5">
+            {/* Welcome whiteboard — Sunlit Lawn warm greeting beat. */}
+            <div className="flex justify-center -mt-2">
+              <div className="w-44 sm:w-48">
+                <Whiteboard
+                  variant="a-frame"
+                  title={`welcome, ${firstName}!`}
+                  subtitle="let's set up your shirt"
+                  markerColor="blue"
+                  rotation="left"
+                />
+              </div>
+            </div>
+
+            <h2 className="text-eyebrow-display">The basics</h2>
 
             <div>
-              <label className="label">Display name</label>
-              <input className="input" value={form.displayName}
-                onChange={e => set('displayName', e.target.value)} placeholder="Your name" />
+              <label className="label" htmlFor="onboarding-display-name">Display name</label>
+              <div className="relative">
+                <input
+                  id="onboarding-display-name"
+                  className="input"
+                  value={form.displayName}
+                  onChange={e => set('displayName', e.target.value)}
+                  onFocus={() => setFocused('displayName')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="Your name"
+                />
+                <InkUnderline active={displayNameActive} />
+              </div>
             </div>
 
             <div>
-              <label className="label">Enrollment number</label>
-              <input className="input" value={form.enrollmentNumber}
-                onChange={e => set('enrollmentNumber', e.target.value)} placeholder="e.g. 22CS001" />
+              <label className="label" htmlFor="onboarding-enrollment">Enrollment number</label>
+              <div className="relative">
+                <input
+                  id="onboarding-enrollment"
+                  className="input"
+                  value={form.enrollmentNumber}
+                  onChange={e => set('enrollmentNumber', e.target.value)}
+                  onFocus={() => setFocused('enrollmentNumber')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="e.g. 22CS001"
+                />
+                <InkUnderline active={enrollmentActive} />
+              </div>
             </div>
 
             <div>
-              <label className="label">Academic group</label>
-              <select className="input" value={form.academicGroupId}
-                onChange={e => set('academicGroupId', e.target.value)}>
-                <option value="">Select group…</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              <span className="label">Program</span>
+              <div className="input flex items-center justify-between bg-paper-50 text-ink-500">
+                <span>B.Tech Computer Science</span>
+                <span className="text-xs text-ink-500">v1 cohort</span>
+              </div>
+              <p className="mt-1 text-xs text-ink-500">
+                Other courses will be added when classmates request access.
+              </p>
             </div>
 
             <div>
-              <label className="label">Program</label>
-              <select className="input" value={form.programId}
-                onChange={e => set('programId', e.target.value)}
-                disabled={!form.academicGroupId}>
-                <option value="">Select program…</option>
-                {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="label">Batch / Graduation year</label>
-              <select className="input" value={form.batchId}
-                onChange={e => set('batchId', e.target.value)}
-                disabled={!form.programId}>
-                <option value="">Select batch…</option>
-                {batches.map(b => <option key={b.id} value={b.id}>{b.label ?? b.graduation_year}</option>)}
-              </select>
+              <span className="label">Your batch (01 – 52)</span>
+              {batches.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-black/15 bg-white/50 p-3 text-xs text-ink-500">
+                  Loading batches…
+                </p>
+              ) : (
+                <div className="grid grid-cols-6 gap-1.5">
+                  {batches.map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => {
+                        set('batchId', b.id)
+                        set('batchNumber', b.batchNumber)
+                      }}
+                      aria-pressed={form.batchId === b.id}
+                      className={cn(
+                        'rounded-lg border px-1.5 py-2 text-xs font-semibold transition',
+                        form.batchId === b.id
+                          ? 'border-ink-900 bg-ink-900 text-white'
+                          : 'border-paper-300 bg-white text-ink-900 hover:border-ink-500',
+                      )}
+                    >
+                      {String(b.batchNumber).padStart(2, '0')}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {form.batchNumber !== null && (
+                <p className="mt-1 text-xs text-ink-500">
+                  Selected: Batch {String(form.batchNumber).padStart(2, '0')}
+                </p>
+              )}
             </div>
 
             <button
-              className="btn-primary w-full mt-2"
+              className="pencil-button-primary w-full mt-2"
               disabled={!canProceed1}
               onClick={next}
             >
@@ -221,159 +378,225 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── Step 2 — Avatar ── */}
+        {/* ── Step 2 — Face ── */}
         {step === 2 && (
-          <div className="card p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-ink-900">Create your avatar</h2>
+          <div className="card p-6 space-y-5">
+            <div>
+              <h2 className="text-eyebrow-display">Your face</h2>
+              <p className="text-sm text-ink-500 mt-1">
+                A customised face is the whole point of your shirt — your friends should
+                recognise you. Generate one with the prompt below, upload it, or skip and
+                add it later from Settings.
+              </p>
+            </div>
 
-            {/* Live preview */}
             <div className="flex justify-center">
-              <AvatarDisplay
-                bodyStyle={form.bodyStyle}
-                shirtColor={form.shirtColor}
+              <Avatar
+                presetId={form.presetId}
                 headFrontUrl={form.headFrontUrl}
+                displayName={form.displayName}
                 size="lg"
               />
             </div>
 
-            {/* Body picker */}
-            <div>
-              <label className="label">Body style</label>
-              <div className="grid grid-cols-3 gap-2">
-                {BODY_STYLES.map(b => (
+            <details open className="rounded-xl border border-dashed border-black/15 bg-white/60 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-ink-900">
+                1 · Generate your portrait
+              </summary>
+              <div className="mt-3 space-y-2">
+                <textarea
+                  readOnly
+                  value={AI_PROMPT}
+                  rows={4}
+                  className="w-full resize-none rounded-lg border border-black/10 bg-white p-2 text-xs leading-relaxed text-ink-700"
+                  aria-label="AI portrait prompt"
+                />
+                <div className="flex items-center justify-between text-xs text-ink-500">
+                  <span>Paste into ChatGPT or Ideogram, then come back and upload it.</span>
                   <button
-                    key={b.id}
-                    onClick={() => set('bodyStyle', b.id)}
-                    className={cn(
-                      'p-2 rounded-xl border-2 text-xs text-center transition',
-                      form.bodyStyle === b.id ? 'border-ink-900 bg-ink-900/5' : 'border-gray-200 hover:border-gray-300'
-                    )}
+                    type="button"
+                    onClick={copyPrompt}
+                    className="font-semibold text-ink-900 underline-offset-2 hover:underline"
                   >
-                    <div className="text-2xl mb-1">{b.gender === 'M' ? '👦' : '👧'}</div>
-                    {b.label}
+                    {promptCopied ? 'Copied' : 'Copy prompt'}
                   </button>
-                ))}
+                </div>
               </div>
-            </div>
+            </details>
 
-            {/* Shirt colour */}
             <div>
-              <label className="label">Shirt colour</label>
-              <div className="flex gap-3">
-                {SHIRT_COLORS.map(c => (
-                  <button
-                    key={c.id}
-                    title={c.label}
-                    onClick={() => set('shirtColor', c.hex)}
-                    className={cn(
-                      'w-8 h-8 rounded-full border-2 transition',
-                      form.shirtColor === c.hex ? 'border-ink-900 scale-110' : 'border-transparent'
-                    )}
-                    style={{ background: c.hex, boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Head upload */}
-            <div className="space-y-3">
-              <div>
-                <label className="label">Front head (AI-generated cartoon)</label>
-                <p className="text-xs text-gray-400 mb-2">
-                  Generate your cartoon in ChatGPT or Ideogram, download, then upload here.
-                </p>
-                <HeadUpload
-                  side="front"
-                  currentUrl={form.headFrontUrl}
-                  uploading={uploadingHead === 'front'}
-                  onFile={f => uploadHead(f, 'front')}
-                />
-              </div>
-              <div>
-                <label className="label">Back head</label>
-                <HeadUpload
-                  side="back"
-                  currentUrl={form.headBackUrl}
-                  uploading={uploadingHead === 'back'}
-                  onFile={f => uploadHead(f, 'back')}
-                />
-              </div>
+              <span className="label">2 · Upload your portrait</span>
+              <HeadCropUpload
+                side="front"
+                currentUrl={form.headSource === 'upload' ? form.headFrontUrl : null}
+                onUploaded={url => {
+                  set('headFrontUrl', url)
+                  set('headSource', 'upload')
+                }}
+              />
+              {form.headSource === 'upload' && form.headFrontUrl && (
+                <button
+                  type="button"
+                  onClick={clearFace}
+                  className="mt-2 text-xs font-medium text-ink-500 underline hover:text-ink-700"
+                >
+                  Clear and skip for now
+                </button>
+              )}
             </div>
 
             <div className="flex gap-2">
-              <button className="btn-secondary flex-1" onClick={() => setStep(1)}>← Back</button>
-              <button className="btn-primary flex-1" onClick={next}>Next →</button>
+              <button className="pencil-button flex-1" onClick={back}>← Back</button>
+              <button className="pencil-button-primary flex-1" disabled={!canProceed2} onClick={next}>
+                {form.headSource === 'upload' ? 'Next →' : 'Skip for now →'}
+              </button>
             </div>
           </div>
         )}
 
-        {/* ── Step 3 — Done ── */}
+        {/* ── Step 3 — Body pose + skin tone ── */}
         {step === 3 && (
-          <div className="card p-8 text-center space-y-6">
+          <div className="card p-6 space-y-6">
+            <h2 className="text-eyebrow-display">Your body</h2>
+
             <div className="flex justify-center">
-              <AvatarDisplay
-                bodyStyle={form.bodyStyle}
-                shirtColor={form.shirtColor}
+              <Avatar
+                presetId={form.presetId}
                 headFrontUrl={form.headFrontUrl}
-                size="xl"
+                displayName={form.displayName}
+                size="lg"
               />
             </div>
 
             <div>
-              <h2 className="text-2xl font-display font-bold text-ink-900">Your shirt is ready! 🎉</h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Share your profile and let your batchmates scribble on your shirt.
+              <span className="label">Body pose</span>
+              <div className="grid grid-cols-3 gap-3">
+                {HERO_PRESETS.map(preset => {
+                  const isSelected = form.presetId === preset.id
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => set('presetId', preset.id)}
+                      aria-pressed={isSelected}
+                      className={cn(
+                        'flex flex-col items-center gap-2 rounded-xl border-2 p-3 text-xs text-center transition',
+                        isSelected
+                          ? 'border-ink-900 bg-ink-900/5'
+                          : 'border-paper-300 hover:border-ink-500',
+                      )}
+                    >
+                      <Avatar presetId={preset.id} size="sm" />
+                      <span className="font-medium text-ink-900">{preset.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="label mb-0">Skin tone</span>
+                <span
+                  className="inline-flex h-7 w-7 rounded-full border border-black/15 shadow-inner"
+                  style={{ backgroundColor: skin.hex }}
+                  aria-label={`Current skin preview, hex ${skin.hex}`}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs text-ink-500">
+                  <span>Light</span>
+                  <span className="font-medium text-ink-900">Depth</span>
+                  <span>Deep</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={form.skinDepth}
+                  onChange={e => set('skinDepth', Number(e.target.value))}
+                  aria-label={`Skin depth (${form.skinDepth} of 100)`}
+                  className="mt-1 h-3 w-full cursor-pointer appearance-none rounded-full"
+                  style={{ background: depthTrack }}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-xs text-ink-500">
+                  <span>Cool</span>
+                  <span className="font-medium text-ink-900">Undertone</span>
+                  <span>Warm</span>
+                </div>
+                <input
+                  type="range"
+                  min={-50}
+                  max={50}
+                  value={form.skinUndertone}
+                  onChange={e => set('skinUndertone', Number(e.target.value))}
+                  aria-label={`Skin undertone (${form.skinUndertone}, range -50 cool to 50 warm)`}
+                  className="mt-1 h-3 w-full cursor-pointer appearance-none rounded-full"
+                  style={{ background: undertoneTrack }}
+                />
+              </div>
+
+              <p className="text-xs text-ink-500">
+                Two sliders — lightness and warmth. Curated range only; no raw colour picker.
               </p>
             </div>
 
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
+            <div className="flex gap-2">
+              <button className="pencil-button flex-1" onClick={back}>← Back</button>
+              <button className="pencil-button-primary flex-1" disabled={!canProceed3} onClick={next}>
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4 — Review ── */}
+        {step === 4 && (
+          <div className="card p-8 space-y-6">
+            <div className="flex justify-center">
+              <Avatar
+                presetId={form.presetId}
+                headFrontUrl={form.headFrontUrl}
+                displayName={form.displayName}
+                size="xl"
+              />
+            </div>
+
+            <div className="text-center">
+              <h2 className="text-hero-display">Looks like you?</h2>
+              <p className="text-nostalgia mt-1">
+                Tap any section to tweak. Everything is editable from Settings later too.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button className="pencil-button text-xs py-2" onClick={() => goTo(1)}>Edit basics</button>
+              <button className="pencil-button text-xs py-2" onClick={() => goTo(2)}>Edit face</button>
+              <button className="pencil-button text-xs py-2" onClick={() => goTo(3)}>Edit body</button>
+            </div>
+
+            {form.headSource === 'skipped' && (
+              <p className="rounded-xl border border-dashed border-black/15 bg-white/60 p-3 text-center text-xs text-ink-500">
+                No face yet — you&apos;ll see a friendly placeholder until you add one in Settings.
+              </p>
             )}
 
-            <div className="flex flex-col gap-3">
-              <button
-                className="btn-primary w-full text-base py-3"
-                onClick={complete}
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : '✓ Enter Scribbl'}
-              </button>
-              <button className="btn-secondary w-full" onClick={() => setStep(2)}>← Edit avatar</button>
-            </div>
+            {error && <p className="text-sm text-red-500 text-center" role="alert">{error}</p>}
+
+            <button
+              className="pencil-button-primary w-full text-base py-3"
+              onClick={complete}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Looks good — open my dashboard'}
+            </button>
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-// ── HeadUpload sub-component ──────────────────────────────────
-
-function HeadUpload({
-  side, currentUrl, uploading, onFile
-}: { side: string; currentUrl: string | null; uploading: boolean; onFile: (f: File) => void }) {
-  return (
-    <label className={cn(
-      'flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition',
-      'hover:border-ink-900/40 border-gray-200'
-    )}>
-      {currentUrl ? (
-        <img src={currentUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
-      ) : (
-        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xl">
-          {uploading ? '⏳' : '📷'}
-        </div>
-      )}
-      <div className="flex-1">
-        <p className="text-sm font-medium text-ink-700">
-          {currentUrl ? 'Change image' : `Upload ${side} head`}
-        </p>
-        <p className="text-xs text-gray-400">PNG or JPEG, max 5 MB</p>
-      </div>
-      <input type="file" accept="image/png,image/jpeg" className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f) }}
-        disabled={uploading}
-      />
-    </label>
   )
 }

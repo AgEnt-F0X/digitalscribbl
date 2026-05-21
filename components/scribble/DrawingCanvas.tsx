@@ -4,405 +4,658 @@ import {
   useEffect, useRef, useCallback, forwardRef, useImperativeHandle,
 } from 'react'
 import {
-  TOOL_PEN, TOOL_PENCIL, TOOL_TEXT, TOOL_LINE,
-  TOOL_CIRCLE, TOOL_RECT, TOOL_ARROW, TOOL_ERASER, TOOL_SELECT,
-  MAX_UNDO_STEPS,
+  TOOL_PEN, TOOL_PENCIL, TOOL_MARKER, TOOL_HIGHLIGHTER, TOOL_BRUSH,
+  TOOL_TEXT, TOOL_LINE, TOOL_CIRCLE, TOOL_RECT, TOOL_ARROW,
+  TOOL_ERASER, TOOL_SELECT, MAX_UNDO_STEPS,
 } from '@/lib/constants'
+import { hasDrawableFabricJson } from '@/lib/utils/scribbleContract'
+import { pointInPolygon, type ShirtTemplate } from '@/lib/utils/shirtTemplate'
 import type { StrokeEvent } from '@/lib/hooks/useShirtChannel'
-
-// ── Types ─────────────────────────────────────────────────────
+import type { ScribbleBox } from '@/lib/utils/scribbleContract'
 
 export type DrawingTool =
-  | typeof TOOL_PEN    | typeof TOOL_PENCIL | typeof TOOL_TEXT
-  | typeof TOOL_LINE   | typeof TOOL_CIRCLE | typeof TOOL_RECT
-  | typeof TOOL_ARROW  | typeof TOOL_ERASER | typeof TOOL_SELECT
+  | typeof TOOL_PEN | typeof TOOL_PENCIL | typeof TOOL_MARKER
+  | typeof TOOL_HIGHLIGHTER | typeof TOOL_BRUSH | typeof TOOL_TEXT
+  | typeof TOOL_LINE | typeof TOOL_CIRCLE | typeof TOOL_RECT
+  | typeof TOOL_ARROW | typeof TOOL_ERASER | typeof TOOL_SELECT
+
+const FREEHAND_BRUSHES = new Set<DrawingTool>([
+  TOOL_PEN, TOOL_PENCIL, TOOL_MARKER, TOOL_HIGHLIGHTER, TOOL_BRUSH,
+])
 
 export interface DrawingCanvasRef {
-  exportSvg():  string           // SVG string (vector, preferred)
-  exportPng():  Promise<string>  // base64 PNG (legacy, kept for fallback)
-  exportJson(): object           // Fabric.js canvas JSON
-  undo():       void
-  clear():      void
+  exportSvg(): string
+  exportPng(): Promise<string>
+  exportJson(): object
+  exportLayer(options?: { fullCanvas?: boolean }): Promise<{ box: ScribbleBox; canvasJson: object; canvasSvg: string } | null>
+  addEmoji(emoji: string): void
+  addText(text: string, options?: { color?: string; fontSize?: number; fontFamily?: string; fontWeight?: number; backgroundColor?: string }): void
+  loadJson(fabricJson: object): void
+  isEmpty(): boolean
+  undo(): void
+  redo(): void
+  clear(): void
+  /**
+   * Re-style every text-like object on the canvas with the supplied props.
+   * Used by Signature mode so the user can flip font / colour / size in the
+   * side panel and see the canvas update live without re-typing.
+   */
+  restyleAllText(options: {
+    fill?: string
+    fontFamily?: string
+    fontWeight?: number
+    fontSize?: number
+    backgroundColor?: string
+  }): void
 }
 
 interface DrawingCanvasProps {
-  w:          number
-  h:          number
-  tool:       DrawingTool
-  color:      string
-  brushSize:  number
-  opacity:    number          // 0.1 – 1
-  fillShapes: boolean         // solid fill vs outline-only
-  fontSize:   'sm' | 'md' | 'lg'
-  fontStyle:  'normal' | 'bold' | 'italic'
-  onStroke:   (fabricJson: object) => void
+  w: number
+  h: number
+  tool: DrawingTool
+  color: string
+  brushSize: number
+  opacity: number
+  fillShapes: boolean
+  fontSize: 'sm' | 'md' | 'lg'
+  fontStyle: 'normal' | 'bold' | 'italic'
+  onStroke: (fabricJson: object) => void
+  initialJson?: object | null
   onRemoteStroke?: (handler: (event: StrokeEvent) => void) => void
+  clipPath?: string
+  /**
+   * Optional polygon (in canvas coordinates) used to snap-clamp text/sticker
+   * spawn points to the drawable region. When provided alongside `clipPath`
+   * it guarantees the visible clipping AND the spawn coordinates agree.
+   */
+  drawablePolygon?: ShirtTemplate['drawablePolygon']
 }
 
-const FONT_SIZE_MAP = { sm: 14, md: 20, lg: 28 }
+type FabricModule = typeof import('fabric')
+type FabricCanvas = import('fabric').Canvas
+type FabricObject = import('fabric').Object
+type FabricEvent = { e: Event; target?: FabricObject | null; scenePoint?: Point }
+type Point = { x: number; y: number }
+type LiveShapeKind = typeof TOOL_LINE | typeof TOOL_RECT | typeof TOOL_CIRCLE | typeof TOOL_ARROW
+type FabricRect = { left: number; top: number; width: number; height: number }
 
-/** Convert a pointer/mouse event position to canvas-pixel coords. */
-function getPoint(
-  e: { clientX: number; clientY: number },
-  el: HTMLElement,
-  w: number,
-  h: number,
-): { x: number; y: number } {
-  const r = el.getBoundingClientRect()
+const FONT_SIZE_MAP = { sm: 14, md: 20, lg: 28 }
+const MIN_SHAPE_DRAG = 3
+const LAYER_PADDING = 10
+
+function applyClipPath(canvas: FabricCanvas, mod: FabricModule, clipPath?: string) {
+  const clippedCanvas = canvas as FabricCanvas & { clipPath?: FabricObject }
+  if (!clipPath) {
+    clippedCanvas.clipPath = undefined
+    canvas.requestRenderAll()
+    return
+  }
+
+  const path = new mod.Path(clipPath, {
+    left: 0,
+    top: 0,
+    selectable: false,
+    evented: false,
+    absolutePositioned: true,
+  } as ConstructorParameters<typeof mod.Path>[1]) as FabricObject
+  clippedCanvas.clipPath = path
+  canvas.requestRenderAll()
+}
+
+function getCanvasPoint(canvas: FabricCanvas, event: FabricEvent): Point {
+  const pointer = event.scenePoint ?? (canvas as unknown as {
+    getScenePoint: (e: Event) => Point
+  }).getScenePoint(event.e)
+  return { x: pointer.x, y: pointer.y }
+}
+
+function setObjectInteractivity(canvas: FabricCanvas, selectable: boolean, evented = selectable) {
+  canvas.forEachObject(object => object.set({ selectable, evented }))
+}
+
+function clampRect(rect: FabricRect, canvasW: number, canvasH: number): ScribbleBox {
+  const rawLeft = Math.max(0, Math.floor(rect.left - LAYER_PADDING))
+  const rawTop = Math.max(0, Math.floor(rect.top - LAYER_PADDING))
+  const right = Math.min(canvasW, Math.ceil(rect.left + rect.width + LAYER_PADDING))
+  const bottom = Math.min(canvasH, Math.ceil(rect.top + rect.height + LAYER_PADDING))
+  const w = Math.min(canvasW, Math.max(40, right - rawLeft))
+  const h = Math.min(canvasH, Math.max(40, bottom - rawTop))
   return {
-    x: ((e.clientX - r.left) / r.width)  * w,
-    y: ((e.clientY - r.top)  / r.height) * h,
+    x: Math.max(0, Math.min(canvasW - w, rawLeft)),
+    y: Math.max(0, Math.min(canvasH - h, rawTop)),
+    w,
+    h,
   }
 }
 
-// ── Component ─────────────────────────────────────────────────
+function getObjectsBounds(objects: FabricObject[], canvasW: number, canvasH: number): ScribbleBox | null {
+  if (objects.length === 0) return null
+
+  let left = Number.POSITIVE_INFINITY
+  let top = Number.POSITIVE_INFINITY
+  let right = Number.NEGATIVE_INFINITY
+  let bottom = Number.NEGATIVE_INFINITY
+
+  for (const object of objects) {
+    const rect = object.getBoundingRect()
+    left = Math.min(left, rect.left)
+    top = Math.min(top, rect.top)
+    right = Math.max(right, rect.left + rect.width)
+    bottom = Math.max(bottom, rect.top + rect.height)
+  }
+
+  if (![left, top, right, bottom].every(Number.isFinite)) return null
+  return clampRect({ left, top, width: right - left, height: bottom - top }, canvasW, canvasH)
+}
+
+/**
+ * Find the closest point inside the drawable polygon. We use this to gently
+ * snap text/sticker spawn coordinates back inside the shirt when the user
+ * taps just outside the clipped region. Iterating polygon edges is cheap for
+ * the ~10-vertex shirt polygon and avoids pulling in a heavier geometry lib.
+ */
+function snapPointInsidePolygon(point: Point, polygon: ShirtTemplate['drawablePolygon']): Point {
+  if (pointInPolygon(point, polygon)) return point
+
+  let bestX = point.x
+  let bestY = point.y
+  let bestDist = Number.POSITIVE_INFINITY
+
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]
+    const b = polygon[(i + 1) % polygon.length]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const lenSq = dx * dx + dy * dy
+    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq))
+    const projX = a.x + t * dx
+    const projY = a.y + t * dy
+    const distSq = (projX - point.x) ** 2 + (projY - point.y) ** 2
+    if (distSq < bestDist) {
+      bestDist = distSq
+      bestX = projX
+      bestY = projY
+    }
+  }
+
+  // Pull the snap point a few px deeper toward the polygon centroid so the
+  // spawned object isn't *on* the edge (where Fabric handles would clip).
+  let cx = 0
+  let cy = 0
+  for (const vertex of polygon) {
+    cx += vertex.x
+    cy += vertex.y
+  }
+  cx /= polygon.length
+  cy /= polygon.length
+  const towardCenterX = cx - bestX
+  const towardCenterY = cy - bestY
+  const towardLen = Math.hypot(towardCenterX, towardCenterY) || 1
+  const inset = Math.min(12, towardLen)
+  return {
+    x: bestX + (towardCenterX / towardLen) * inset,
+    y: bestY + (towardCenterY / towardLen) * inset,
+  }
+}
 
 const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function DrawingCanvas(
-  { w, h, tool, color, brushSize, opacity, fillShapes, fontSize, fontStyle, onStroke, onRemoteStroke },
+  { w, h, tool, color, brushSize, opacity, fillShapes, fontSize, fontStyle, onStroke, initialJson, onRemoteStroke, clipPath, drawablePolygon },
   ref,
 ) {
-  const domRef      = useRef<HTMLCanvasElement>(null)
-  const fabricRef   = useRef<import('fabric').Canvas | null>(null)
-  const fabricMod   = useRef<typeof import('fabric') | null>(null)
-  const undoStack   = useRef<string[]>([])
-  const isPtrDown   = useRef(false)
-  const startPt     = useRef<{ x: number; y: number } | null>(null)
-  const liveShape   = useRef<import('fabric').Object | null>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const fabricRef = useRef<FabricCanvas | null>(null)
+  const fabricMod = useRef<FabricModule | null>(null)
+  const undoStack = useRef<string[]>([])
+  const redoStack = useRef<string[]>([])
+  const isPointerDown = useRef(false)
+  const liveShape = useRef<{ kind: LiveShapeKind; object: FabricObject; start: Point } | null>(null)
 
-  // Stable refs — readable inside Fabric event callbacks that are set up once
-  const colorRef     = useRef(color)
-  const opacityRef   = useRef(opacity)
-  const fillRef      = useRef(fillShapes)
-  const brushSzRef   = useRef(brushSize)
-  const toolRef      = useRef(tool)
-  const onStrokeRef  = useRef(onStroke)
-  const fontSzRef    = useRef(fontSize)
-  const fontStRef    = useRef(fontStyle)
+  const colorRef = useRef(color)
+  const opacityRef = useRef(opacity)
+  const fillRef = useRef(fillShapes)
+  const brushSzRef = useRef(brushSize)
+  const toolRef = useRef(tool)
+  const onStrokeRef = useRef(onStroke)
+  const fontSzRef = useRef(fontSize)
+  const fontStRef = useRef(fontStyle)
+  const polygonRef = useRef(drawablePolygon)
 
-  useEffect(() => { colorRef.current    = color      }, [color])
-  useEffect(() => { opacityRef.current  = opacity    }, [opacity])
-  useEffect(() => { fillRef.current     = fillShapes }, [fillShapes])
-  useEffect(() => { brushSzRef.current  = brushSize  }, [brushSize])
-  useEffect(() => { toolRef.current     = tool       }, [tool])
-  useEffect(() => { onStrokeRef.current = onStroke   }, [onStroke])
-  useEffect(() => { fontSzRef.current   = fontSize   }, [fontSize])
-  useEffect(() => { fontStRef.current   = fontStyle  }, [fontStyle])
+  useEffect(() => { colorRef.current = color }, [color])
+  useEffect(() => { opacityRef.current = opacity }, [opacity])
+  useEffect(() => { fillRef.current = fillShapes }, [fillShapes])
+  useEffect(() => { brushSzRef.current = brushSize }, [brushSize])
+  useEffect(() => { toolRef.current = tool }, [tool])
+  useEffect(() => { onStrokeRef.current = onStroke }, [onStroke])
+  useEffect(() => { fontSzRef.current = fontSize }, [fontSize])
+  useEffect(() => { fontStRef.current = fontStyle }, [fontStyle])
+  useEffect(() => { polygonRef.current = drawablePolygon }, [drawablePolygon])
 
-  const snapshot = useCallback(() => {
-    const canvas = fabricRef.current
-    if (!canvas) return
+  const pushSnapshot = useCallback((canvas: FabricCanvas) => {
     const json = JSON.stringify(canvas.toJSON())
+    const last = undoStack.current[undoStack.current.length - 1]
+    if (json === last) return
     undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_STEPS - 1)), json]
+    redoStack.current = []
   }, [])
 
-  // ── Fabric.js init (runs once on mount) ───────────────────
+  const commitCanvas = useCallback((canvas: FabricCanvas) => {
+    pushSnapshot(canvas)
+    onStrokeRef.current(canvas.toJSON())
+  }, [pushSnapshot])
+
+  const cancelLiveShape = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas || !liveShape.current) return
+    canvas.remove(liveShape.current.object)
+    liveShape.current = null
+    isPointerDown.current = false
+    canvas.requestRenderAll()
+  }, [])
+
+  const eraseTarget = useCallback((canvas: FabricCanvas, event: FabricEvent) => {
+    const fallbackTarget = (canvas as unknown as {
+      findTarget?: (e: Event, skipGroup?: boolean) => FabricObject | undefined
+    }).findTarget?.(event.e, false)
+    const target = event.target ?? fallbackTarget
+    if (!target) return
+
+    canvas.remove(target)
+    canvas.discardActiveObject()
+    canvas.requestRenderAll()
+    commitCanvas(canvas)
+  }, [commitCanvas])
+
   useEffect(() => {
-    let canvas: import('fabric').Canvas | null = null
+    let canvas: FabricCanvas | null = null
     let disposed = false
+    const host = hostRef.current
+    if (!host) return
 
     import('fabric').then(mod => {
-      if (!domRef.current || disposed) return
-      fabricMod.current = mod
-      domRef.current.removeAttribute('data-fabric')
-      domRef.current.classList.remove('lower-canvas')
+      if (!hostRef.current || disposed) return
 
-      const liveCanvas = new mod.Canvas(domRef.current, {
-        width:               w,
-        height:              h,
-        backgroundColor:     undefined,   // transparent
-        selection:           false,
-        isDrawingMode:       false,
+      const canvasEl = document.createElement('canvas')
+      canvasEl.width = w
+      canvasEl.height = h
+      canvasEl.style.width = '100%'
+      canvasEl.style.height = '100%'
+      canvasEl.style.touchAction = 'none'
+      hostRef.current.replaceChildren(canvasEl)
+
+      const liveCanvas = new mod.Canvas(canvasEl, {
+        width: w,
+        height: h,
+        backgroundColor: undefined,
+        selection: false,
+        isDrawingMode: false,
         enableRetinaScaling: false,
       })
+
       canvas = liveCanvas
-
+      fabricRef.current = liveCanvas
+      fabricMod.current = mod
       liveCanvas.freeDrawingBrush = new mod.PencilBrush(liveCanvas)
-      fabricRef.current           = liveCanvas
+      applyClipPath(liveCanvas, mod, clipPath)
 
-      // Freehand stroke finished → apply opacity, snapshot, broadcast
+      const canvasDom = liveCanvas as unknown as {
+        wrapperEl?: HTMLElement
+        upperCanvasEl?: HTMLCanvasElement
+        lowerCanvasEl?: HTMLCanvasElement
+      }
+      for (const el of [canvasDom.wrapperEl, canvasDom.upperCanvasEl, canvasDom.lowerCanvasEl]) {
+        if (!el) continue
+        el.style.width = '100%'
+        el.style.height = '100%'
+        el.style.touchAction = 'none'
+      }
+
+      const handleMouseDown = (event: FabricEvent) => {
+        const activeTool = toolRef.current
+
+        if (activeTool === TOOL_ERASER) {
+          isPointerDown.current = true
+          eraseTarget(liveCanvas, event)
+          return
+        }
+
+        if (
+          FREEHAND_BRUSHES.has(activeTool) ||
+          activeTool === TOOL_SELECT
+        ) {
+          return
+        }
+
+        const rawPoint = getCanvasPoint(liveCanvas, event)
+        // Snap text/sticker spawn coordinates back inside the drawable polygon
+        // so a tap on the shirt's chrome (collar, sleeves) still produces an
+        // object that is visible inside the clipped area. Freehand strokes
+        // are clipped at the Fabric level via `clipPath`, so this guard only
+        // matters for spawn-based primitives.
+        const polygon = polygonRef.current
+        const point = polygon ? snapPointInsidePolygon(rawPoint, polygon) : rawPoint
+        const col = colorRef.current
+        const strokeWidth = brushSzRef.current
+        const op = opacityRef.current
+        const fill = fillRef.current
+
+        if (activeTool === TOOL_TEXT) {
+          const text = new mod.IText('Type here', {
+            left: point.x,
+            top: point.y,
+            fontSize: FONT_SIZE_MAP[fontSzRef.current],
+            fontWeight: fontStRef.current === 'bold' ? 'bold' : 'normal',
+            fontStyle: fontStRef.current === 'italic' ? 'italic' : 'normal',
+            fill: col,
+            opacity: op,
+            editable: true,
+            selectable: true,
+            evented: true,
+          })
+          liveCanvas.add(text)
+          liveCanvas.setActiveObject(text)
+          text.enterEditing()
+          text.selectAll()
+          commitCanvas(liveCanvas)
+          return
+        }
+
+        isPointerDown.current = true
+
+        if (activeTool === TOOL_RECT) {
+          const shape = new mod.Rect({
+            left: point.x,
+            top: point.y,
+            width: 1,
+            height: 1,
+            fill: fill ? col : 'transparent',
+            stroke: col,
+            strokeWidth,
+            opacity: op,
+            selectable: false,
+            evented: false,
+          })
+          liveCanvas.add(shape)
+          liveShape.current = { kind: TOOL_RECT, object: shape, start: point }
+        }
+
+        if (activeTool === TOOL_CIRCLE) {
+          const shape = new mod.Circle({
+            left: point.x,
+            top: point.y,
+            radius: 1,
+            fill: fill ? col : 'transparent',
+            stroke: col,
+            strokeWidth,
+            opacity: op,
+            selectable: false,
+            evented: false,
+          })
+          liveCanvas.add(shape)
+          liveShape.current = { kind: TOOL_CIRCLE, object: shape, start: point }
+        }
+
+        if (activeTool === TOOL_LINE || activeTool === TOOL_ARROW) {
+          const shape = new mod.Line([point.x, point.y, point.x, point.y], {
+            stroke: col,
+            strokeWidth,
+            opacity: op,
+            selectable: false,
+            evented: false,
+          })
+          liveCanvas.add(shape)
+          liveShape.current = { kind: activeTool, object: shape, start: point }
+        }
+      }
+
+      const handleMouseMove = (event: FabricEvent) => {
+        if (toolRef.current === TOOL_ERASER && isPointerDown.current) {
+          eraseTarget(liveCanvas, event)
+          return
+        }
+
+        const current = liveShape.current
+        if (!isPointerDown.current || !current) return
+
+        const point = getCanvasPoint(liveCanvas, event)
+        const { start, object, kind } = current
+
+        if (kind === TOOL_RECT) {
+          object.set({
+            width: Math.abs(point.x - start.x),
+            height: Math.abs(point.y - start.y),
+            left: Math.min(point.x, start.x),
+            top: Math.min(point.y, start.y),
+          })
+        }
+
+        if (kind === TOOL_CIRCLE) {
+          const radius = Math.hypot(point.x - start.x, point.y - start.y) / 2
+          object.set({
+            radius,
+            left: (start.x + point.x) / 2 - radius,
+            top: (start.y + point.y) / 2 - radius,
+          })
+        }
+
+        if (kind === TOOL_LINE || kind === TOOL_ARROW) {
+          object.set({ x2: point.x, y2: point.y })
+        }
+
+        liveCanvas.requestRenderAll()
+      }
+
+      const handleMouseUp = (event: FabricEvent) => {
+        if (toolRef.current === TOOL_ERASER) {
+          isPointerDown.current = false
+          return
+        }
+
+        const current = liveShape.current
+        if (!isPointerDown.current || !current) return
+
+        isPointerDown.current = false
+        liveShape.current = null
+
+        const end = getCanvasPoint(liveCanvas, event)
+        const { start, object, kind } = current
+        const distance = Math.hypot(end.x - start.x, end.y - start.y)
+
+        if (distance < MIN_SHAPE_DRAG) {
+          liveCanvas.remove(object)
+          liveCanvas.requestRenderAll()
+          return
+        }
+
+        if (kind === TOOL_ARROW) {
+          liveCanvas.remove(object)
+
+          const angle = Math.atan2(end.y - start.y, end.x - start.x)
+          const angleDeg = angle * (180 / Math.PI)
+          const strokeWidth = brushSzRef.current
+          const headSize = Math.max(12, strokeWidth * 4)
+          const col = colorRef.current
+          const op = opacityRef.current
+          const lineEndX = end.x - headSize * 0.7 * Math.cos(angle)
+          const lineEndY = end.y - headSize * 0.7 * Math.sin(angle)
+
+          const lineObj = new mod.Line([start.x, start.y, lineEndX, lineEndY], {
+            stroke: col,
+            strokeWidth,
+            selectable: false,
+            evented: false,
+          })
+          const head = new mod.Triangle({
+            left: end.x,
+            top: end.y,
+            width: headSize,
+            height: headSize * 1.3,
+            fill: col,
+            angle: angleDeg + 90,
+            originX: 'center',
+            originY: 'center',
+            selectable: false,
+            evented: false,
+          })
+          const arrow = new mod.Group([lineObj, head], {
+            opacity: op,
+            selectable: false,
+            evented: false,
+          })
+          liveCanvas.add(arrow)
+        }
+
+        liveCanvas.requestRenderAll()
+        commitCanvas(liveCanvas)
+      }
+
+      liveCanvas.on('mouse:down', handleMouseDown)
+      liveCanvas.on('mouse:move', handleMouseMove)
+      liveCanvas.on('mouse:up', handleMouseUp)
+
       liveCanvas.on('path:created', ({ path }) => {
-        path.set('opacity', opacityRef.current)
-        liveCanvas.renderAll()
-        snapshot()
-        onStrokeRef.current(liveCanvas.toJSON())
+        const activeTool = toolRef.current
+        // Mirror the brush's stroke styling onto the resulting Path so the
+        // SVG export (which the rest of the app uses for compositing) shows
+        // a marker/highlighter that matches what the user saw while drawing.
+        const strokeLineCap: CanvasLineCap = activeTool === TOOL_HIGHLIGHTER ? 'butt' : 'round'
+        const strokeLineJoin: CanvasLineJoin = activeTool === TOOL_HIGHLIGHTER ? 'miter' : 'round'
+        path.set({
+          opacity: opacityRef.current,
+          selectable: false,
+          evented: false,
+          strokeLineCap,
+          strokeLineJoin,
+        })
+        liveCanvas.requestRenderAll()
+        commitCanvas(liveCanvas)
       })
 
-      // Text edit exited
       liveCanvas.on('text:editing:exited', () => {
-        snapshot()
-        onStrokeRef.current(liveCanvas.toJSON())
+        commitCanvas(liveCanvas)
       })
 
-      // Object moved / resized in select mode
       liveCanvas.on('object:modified', () => {
-        snapshot()
-        onStrokeRef.current(liveCanvas.toJSON())
+        commitCanvas(liveCanvas)
       })
 
-      // Remote strokes (collaborative — same box, future use)
-      if (onRemoteStroke) {
-        onRemoteStroke(({ fabricJson }) => {
-          if (disposed) return
-          liveCanvas.loadFromJSON(fabricJson, () => liveCanvas.renderAll())
+      if (initialJson && hasDrawableFabricJson(initialJson)) {
+        void liveCanvas.loadFromJSON(initialJson).then(() => {
+          liveCanvas.renderAll()
+          pushSnapshot(liveCanvas)
+          onStrokeRef.current(liveCanvas.toJSON())
         })
       }
 
-      snapshot() // empty initial state
+      if (onRemoteStroke) {
+        onRemoteStroke(({ fabricJson }) => {
+          if (disposed) return
+          void liveCanvas.loadFromJSON(fabricJson).then(() => liveCanvas.renderAll())
+        })
+      }
+
+      pushSnapshot(liveCanvas)
     })
 
     return () => {
       disposed = true
-      try { canvas?.dispose() } catch { /* ignore */ }
+      try {
+        canvas?.dispose()
+      } catch {
+        // Fabric cleanup should not block React unmount.
+      }
       canvas = null
       fabricRef.current = null
       fabricMod.current = null
+      liveShape.current = null
+      isPointerDown.current = false
+      host.replaceChildren()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [w, h, initialJson, onRemoteStroke, commitCanvas, eraseTarget, pushSnapshot, clipPath])
 
-  // ── Sync tool / color / brushSize → configure Fabric ──────
   useEffect(() => {
     const canvas = fabricRef.current
-    const mod    = fabricMod.current
+    const mod = fabricMod.current
     if (!canvas || !mod) return
 
-    // Cancel any in-progress shape draw
-    isPtrDown.current = false
-    if (liveShape.current) {
-      canvas.remove(liveShape.current)
-      liveShape.current = null
-    }
-    startPt.current = null
+    cancelLiveShape()
 
-    // ── Select mode ─────────────────────────────────────────
-    if (tool === TOOL_SELECT) {
-      canvas.isDrawingMode = false
-      canvas.selection     = true
-      canvas.forEachObject(o => o.set({ selectable: true, evented: true }))
-      canvas.renderAll()
-      return
-    }
-
-    // Non-select: lock all objects
+    canvas.isDrawingMode = false
     canvas.selection = false
-    canvas.forEachObject(o => o.set({ selectable: false, evented: false }))
-    canvas.discardActiveObject()
+    canvas.defaultCursor = 'crosshair'
+    canvas.hoverCursor = 'crosshair'
+    setObjectInteractivity(canvas, false)
 
-    // ── Freehand modes ───────────────────────────────────────
-    if (tool === TOOL_PEN || tool === TOOL_PENCIL) {
-      canvas.isDrawingMode = true
-      const brush = new mod.PencilBrush(canvas)
-      brush.color = color
-      brush.width = brushSize
-      if (tool === TOOL_PENCIL) {
-        // Rougher: less smoothing
-        ;(brush as unknown as { decimate: number }).decimate = 10
-      }
-      canvas.freeDrawingBrush = brush
+    if (tool === TOOL_SELECT) {
+      canvas.selection = true
+      canvas.defaultCursor = 'default'
+      canvas.hoverCursor = 'move'
+      setObjectInteractivity(canvas, true)
       canvas.renderAll()
       return
     }
 
     if (tool === TOOL_ERASER) {
-      canvas.isDrawingMode = true
-      // Try Fabric 6.x EraserBrush; fall back to white-paint erase
-      const FabAny = mod as Record<string, unknown>
-      if (typeof FabAny['EraserBrush'] === 'function') {
-        const EraserBrushClass = FabAny['EraserBrush'] as new (c: import('fabric').Canvas) => import('fabric').BaseBrush
-        const eraser           = new EraserBrushClass(canvas)
-        eraser.width           = brushSize * 3
-        canvas.freeDrawingBrush = eraser
-      } else {
-        const brush = new mod.PencilBrush(canvas)
-        brush.color = '#FFFFFF'
-        brush.width = brushSize * 3
-        canvas.freeDrawingBrush = brush
-      }
+      canvas.defaultCursor = 'not-allowed'
+      canvas.hoverCursor = 'not-allowed'
+      setObjectInteractivity(canvas, false, true)
       canvas.renderAll()
       return
     }
 
-    // Shape / text tools: turn off freehand
-    canvas.isDrawingMode = false
-    canvas.renderAll()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tool, color, brushSize])
+    if (FREEHAND_BRUSHES.has(tool)) {
+      // Each brush is a Fabric `PencilBrush` with a distinct stroke-param
+      // profile. We deliberately do NOT swap to SprayBrush — keeping all
+      // brushes in PencilBrush keeps `path:created` semantics identical for
+      // undo/redo, layer export, and JSON round-tripping. Differences in
+      // stroke feel are achieved via width clamps, opacity, decimation and
+      // cap/join styles applied to the resulting path on `path:created`.
+      const brush = new mod.PencilBrush(canvas)
+      brush.color = color
+      brush.width = brushSize
 
-  // ── Pointer down (shapes + text) ─────────────────────────
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = fabricRef.current
-    const mod    = fabricMod.current
-    if (!canvas || !mod) return
+      const brushAny = brush as unknown as {
+        decimate?: number
+        strokeLineCap?: CanvasLineCap
+        strokeLineJoin?: CanvasLineJoin
+      }
 
-    const t = toolRef.current
-    // Fabric handles freehand and selection natively
-    if (t === TOOL_PEN || t === TOOL_PENCIL || t === TOOL_ERASER || t === TOOL_SELECT) return
+      if (tool === TOOL_PENCIL) {
+        brushAny.decimate = 10
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+      } else if (tool === TOOL_MARKER) {
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+        brushAny.decimate = 2
+      } else if (tool === TOOL_HIGHLIGHTER) {
+        brushAny.strokeLineCap = 'butt'
+        brushAny.strokeLineJoin = 'miter'
+        brushAny.decimate = 2
+      } else if (tool === TOOL_BRUSH) {
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+        brushAny.decimate = 4
+      } else {
+        // TOOL_PEN — clean default.
+        brushAny.strokeLineCap = 'round'
+        brushAny.strokeLineJoin = 'round'
+      }
 
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const pt = getPoint(e, e.currentTarget, w, h)
-    startPt.current   = pt
-    isPtrDown.current = true
-
-    const col  = colorRef.current
-    const sz   = brushSzRef.current
-    const op   = opacityRef.current
-    const fill = fillRef.current
-
-    if (t === TOOL_TEXT) {
-      const text = new mod.IText('Type here', {
-        left:       pt.x,
-        top:        pt.y,
-        fontSize:   FONT_SIZE_MAP[fontSzRef.current],
-        fontWeight: fontStRef.current === 'bold'   ? 'bold'   : 'normal',
-        fontStyle:  fontStRef.current === 'italic' ? 'italic' : 'normal',
-        fill:       col,
-        opacity:    op,
-        editable:   true,
-        selectable: false,
-        evented:    false,
-      })
-      canvas.add(text)
-      canvas.setActiveObject(text)
-      text.enterEditing()
-      text.selectAll()
-      isPtrDown.current = false
+      canvas.freeDrawingBrush = brush
+      canvas.isDrawingMode = true
+      canvas.defaultCursor = 'crosshair'
+      canvas.hoverCursor = 'crosshair'
+      canvas.renderAll()
       return
     }
 
-    if (t === TOOL_RECT) {
-      const shape = new mod.Rect({
-        left: pt.x, top: pt.y, width: 1, height: 1,
-        fill:        fill ? col : 'transparent',
-        stroke:      col,
-        strokeWidth: sz,
-        opacity:     op,
-        selectable:  false,
-        evented:     false,
-      })
-      canvas.add(shape)
-      liveShape.current = shape
-    }
-
-    if (t === TOOL_CIRCLE) {
-      const shape = new mod.Circle({
-        left: pt.x, top: pt.y, radius: 1,
-        fill:        fill ? col : 'transparent',
-        stroke:      col,
-        strokeWidth: sz,
-        opacity:     op,
-        selectable:  false,
-        evented:     false,
-      })
-      canvas.add(shape)
-      liveShape.current = shape
-    }
-
-    if (t === TOOL_LINE || t === TOOL_ARROW) {
-      const shape = new mod.Line([pt.x, pt.y, pt.x, pt.y], {
-        stroke:      col,
-        strokeWidth: sz,
-        opacity:     op,
-        selectable:  false,
-        evented:     false,
-      })
-      canvas.add(shape)
-      liveShape.current = shape
-    }
-  }, [w, h])
-
-  // ── Pointer move (live shape preview) ────────────────────
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = fabricRef.current
-    const mod    = fabricMod.current
-    if (!canvas || !mod || !isPtrDown.current || !liveShape.current || !startPt.current) return
-
-    const pt    = getPoint(e, e.currentTarget, w, h)
-    const shape = liveShape.current
-
-    if (shape instanceof mod.Rect) {
-      shape.set({
-        width:  Math.abs(pt.x - startPt.current.x),
-        height: Math.abs(pt.y - startPt.current.y),
-        left:   Math.min(pt.x, startPt.current.x),
-        top:    Math.min(pt.y, startPt.current.y),
-      })
-    } else if (shape instanceof mod.Circle) {
-      const r = Math.hypot(pt.x - startPt.current.x, pt.y - startPt.current.y) / 2
-      shape.set({
-        radius: r,
-        left:   (startPt.current.x + pt.x) / 2 - r,
-        top:    (startPt.current.y + pt.y) / 2 - r,
-      })
-    } else if (shape instanceof mod.Line) {
-      shape.set({ x2: pt.x, y2: pt.y })
-    }
-
     canvas.renderAll()
-  }, [w, h])
+  }, [tool, color, brushSize, cancelLiveShape])
 
-  // ── Pointer up (finalize shape) ───────────────────────────
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = fabricRef.current
-    const mod    = fabricMod.current
-    if (!canvas || !mod || !isPtrDown.current) return
-
-    isPtrDown.current = false
-    const t   = toolRef.current
-    const end = getPoint(e, e.currentTarget, w, h)
-
-    // ── Arrow: replace live Line with Line + Triangle Group ─
-    if (t === TOOL_ARROW && liveShape.current instanceof mod.Line && startPt.current) {
-      const sx = startPt.current.x, sy = startPt.current.y
-      const ex = end.x, ey = end.y
-
-      canvas.remove(liveShape.current)
-      liveShape.current = null
-
-      const angle    = Math.atan2(ey - sy, ex - sx)
-      const angleDeg = angle * (180 / Math.PI)
-      const col      = colorRef.current
-      const sz       = brushSzRef.current
-      const op       = opacityRef.current
-      const headSize = Math.max(12, sz * 4)
-
-      // Shorten line so it doesn't poke through the arrowhead
-      const lx2 = ex - headSize * 0.7 * Math.cos(angle)
-      const ly2 = ey - headSize * 0.7 * Math.sin(angle)
-
-      const lineObj = new mod.Line([sx, sy, lx2, ly2], {
-        stroke: col, strokeWidth: sz,
-        selectable: false, evented: false,
-      })
-      const head = new mod.Triangle({
-        left: ex, top: ey,
-        width: headSize, height: headSize * 1.3,
-        fill: col,
-        angle: angleDeg + 90,   // Fabric 0° = pointing up; +90 → pointing along arrow
-        originX: 'center', originY: 'center',
-        selectable: false, evented: false,
-      })
-      const arrow = new mod.Group([lineObj, head], {
-        opacity:    op,
-        selectable: false,
-        evented:    false,
-      })
-      canvas.add(arrow)
-    } else {
-      liveShape.current = null
-    }
-
-    startPt.current = null
-    canvas.renderAll()
-    snapshot()
-    onStrokeRef.current(canvas.toJSON())
-  }, [w, h, snapshot])
-
-  // ── Ref API ───────────────────────────────────────────────
   useImperativeHandle(ref, () => ({
     exportSvg: () => {
       const canvas = fabricRef.current
       if (!canvas) return ''
-      // Fabric.js toSVG() returns a clean SVG string with transparent background
       return canvas.toSVG()
     },
     exportPng: async () => {
@@ -411,34 +664,163 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       return canvas.toDataURL({ format: 'png', multiplier: 1 }).split(',')[1]
     },
     exportJson: () => fabricRef.current?.toJSON() ?? {},
+    exportLayer: async (options) => {
+      const canvas = fabricRef.current
+      const mod = fabricMod.current
+      if (!canvas || !mod) return null
+
+      if (options?.fullCanvas) {
+        return {
+          box: { x: 0, y: 0, w, h },
+          canvasJson: canvas.toJSON(),
+          canvasSvg: canvas.toSVG(),
+        }
+      }
+
+      const objects = canvas.getObjects().filter(object => {
+        const json = object.toObject() as Record<string, unknown>
+        return json.visible !== false && json.opacity !== 0
+      })
+      const box = getObjectsBounds(objects, w, h)
+      if (!box) return null
+
+      const canvasEl = document.createElement('canvas')
+      canvasEl.width = box.w
+      canvasEl.height = box.h
+      const layerCanvas = new mod.StaticCanvas(canvasEl, {
+        width: box.w,
+        height: box.h,
+        backgroundColor: undefined,
+        enableRetinaScaling: false,
+      })
+
+      for (const object of objects) {
+        const cloned = await object.clone()
+        cloned.set({
+          left: Number(cloned.left ?? 0) - box.x,
+          top: Number(cloned.top ?? 0) - box.y,
+        })
+        layerCanvas.add(cloned)
+      }
+
+      layerCanvas.renderAll()
+      const canvasJson = layerCanvas.toJSON()
+      const canvasSvg = layerCanvas.toSVG()
+      layerCanvas.dispose()
+      return { box, canvasJson, canvasSvg }
+    },
+    addEmoji: (emoji: string) => {
+      const canvas = fabricRef.current
+      const mod = fabricMod.current
+      if (!canvas || !mod) return
+      cancelLiveShape()
+      const text = new mod.Text(emoji, {
+        left: Math.max(18, Math.min(w - 58, w / 2 - 28)),
+        top: Math.max(18, Math.min(h - 58, h / 2 - 28)),
+        fontSize: 42,
+        fill: colorRef.current,
+        opacity: opacityRef.current,
+        selectable: true,
+        evented: true,
+      })
+      canvas.add(text)
+      canvas.setActiveObject(text)
+      canvas.requestRenderAll()
+      commitCanvas(canvas)
+    },
+    addText: (text, options) => {
+      const canvas = fabricRef.current
+      const mod = fabricMod.current
+      if (!canvas || !mod || !text.trim()) return
+      cancelLiveShape()
+      const label = new mod.IText(text.trim(), {
+        left: Math.max(18, Math.min(w - 180, w / 2 - 90)),
+        top: Math.max(18, Math.min(h - 80, h / 2 - 40)),
+        fontFamily: options?.fontFamily,
+        fontSize: options?.fontSize ?? FONT_SIZE_MAP[fontSzRef.current],
+        fontWeight: options?.fontWeight ?? (fontStRef.current === 'bold' ? 'bold' : 'normal'),
+        fontStyle: fontStRef.current === 'italic' ? 'italic' : 'normal',
+        fill: options?.color ?? colorRef.current,
+        backgroundColor: options?.backgroundColor,
+        opacity: opacityRef.current,
+        editable: true,
+        selectable: true,
+        evented: true,
+      })
+      canvas.add(label)
+      canvas.setActiveObject(label)
+      canvas.requestRenderAll()
+      commitCanvas(canvas)
+    },
+    loadJson: (fabricJson: object) => {
+      const canvas = fabricRef.current
+      if (!canvas || !hasDrawableFabricJson(fabricJson)) return
+      void canvas.loadFromJSON(fabricJson).then(() => {
+        canvas.renderAll()
+        pushSnapshot(canvas)
+        onStrokeRef.current(canvas.toJSON())
+      })
+    },
+    isEmpty: () => !hasDrawableFabricJson(fabricRef.current?.toJSON() ?? {}),
     undo: () => {
-      if (undoStack.current.length <= 1) return
-      undoStack.current.pop()
-      const prev = undoStack.current[undoStack.current.length - 1]
-      fabricRef.current?.loadFromJSON(JSON.parse(prev), () => {
-        fabricRef.current?.renderAll()
-        onStrokeRef.current(fabricRef.current?.toJSON() ?? {})
+      const canvas = fabricRef.current
+      if (!canvas || undoStack.current.length <= 1) return
+      const current = undoStack.current.pop()
+      if (current) redoStack.current.push(current)
+      const previous = undoStack.current[undoStack.current.length - 1]
+      void canvas.loadFromJSON(JSON.parse(previous)).then(() => {
+        canvas.renderAll()
+        onStrokeRef.current(canvas.toJSON())
+      })
+    },
+    redo: () => {
+      const canvas = fabricRef.current
+      const next = redoStack.current.pop()
+      if (!canvas || !next) return
+      undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_STEPS - 1)), next]
+      void canvas.loadFromJSON(JSON.parse(next)).then(() => {
+        canvas.renderAll()
+        onStrokeRef.current(canvas.toJSON())
       })
     },
     clear: () => {
-      snapshot()
-      fabricRef.current?.clear()
-      fabricRef.current?.renderAll()
-      onStrokeRef.current({})
+      const canvas = fabricRef.current
+      if (!canvas) return
+      cancelLiveShape()
+      canvas.clear()
+      canvas.discardActiveObject()
+      canvas.renderAll()
+      commitCanvas(canvas)
+    },
+    restyleAllText: (options) => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+      let dirty = false
+      for (const object of canvas.getObjects()) {
+        const objAny = object as FabricObject & { type?: string }
+        const type = String(objAny.type ?? '').toLowerCase()
+        if (!type.includes('text')) continue
+        const patch: Record<string, unknown> = {}
+        if (options.fill !== undefined) patch.fill = options.fill
+        if (options.fontFamily !== undefined) patch.fontFamily = options.fontFamily
+        if (options.fontWeight !== undefined) patch.fontWeight = options.fontWeight
+        if (options.fontSize !== undefined) patch.fontSize = options.fontSize
+        if (options.backgroundColor !== undefined) patch.backgroundColor = options.backgroundColor
+        object.set(patch)
+        dirty = true
+      }
+      if (dirty) {
+        canvas.requestRenderAll()
+        commitCanvas(canvas)
+      }
     },
   }))
 
   return (
-    <canvas
-      ref={domRef}
-      width={w}
-      height={h}
-      className="w-full h-full"
-      style={{ touchAction: 'none' }}   // prevents page scroll on touch
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}  // cancel on leave
+    <div
+      ref={hostRef}
+      className="h-full w-full overflow-hidden"
+      style={{ touchAction: 'none' }}
     />
   )
 })

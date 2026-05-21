@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requirePageUser } from '@/lib/auth/server'
-import AvatarDisplay from '@/components/avatar/AvatarDisplay'
+import Avatar from '@/components/avatar/Avatar'
+import BottomNav from '@/components/nav/BottomNav'
 import { ROUTES } from '@/lib/constants'
 import YearbookControls from './YearbookControls'
+import ExportRequestForm from './ExportRequestForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +37,7 @@ export default async function YearbookPage({ searchParams }: Props) {
   let usersQuery = supabase
     .from('users')
     .select(`
-      id, display_name, body_style, shirt_color, head_front_url,
+      id, display_name, body_style, shirt_color, head_front_url, avatar_config,
       yearbook_quote, batch_id,
       batches(label, graduation_year, programs(name)),
       shirts(front_texture_url, front_occupancy)
@@ -71,10 +73,19 @@ export default async function YearbookPage({ searchParams }: Props) {
         ?? String((activeBatch as unknown as { graduation_year: number }).graduation_year))
     : 'All batches'
 
+  const { data: groupMemberships } = await supabase
+    .from('friend_group_members')
+    .select('friend_groups(id, name)')
+    .eq('user_id', user.id)
+
+  const exportGroups = (groupMemberships ?? [])
+    .map(row => row.friend_groups as unknown as { id: string; name: string } | null)
+    .filter((group): group is { id: string; name: string } => Boolean(group?.id))
+
   return (
-    <div className="min-h-screen bg-cream-50">
+    <div className="min-h-screen bg-paper-100 pb-24 md:pb-0">
       {/* Nav */}
-      <nav className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-100 px-4 py-3 flex items-center justify-between print:hidden">
+      <nav className="sticky top-0 z-30 flex items-center justify-between border-b border-[color:var(--line-soft)] bg-paper-100/88 px-4 py-3 backdrop-blur print:hidden">
         <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
         <YearbookControls
           batches={(batches ?? []).map(b => {
@@ -100,6 +111,10 @@ export default async function YearbookPage({ searchParams }: Props) {
             ⬇ My card (PNG)
           </Link>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pt-3">
+        <ExportRequestForm activeBatchId={activeBatchId} batchLabel={batchLabel} groups={exportGroups} />
       </div>
 
       {/* ── Yearbook grid ── */}
@@ -129,10 +144,9 @@ export default async function YearbookPage({ searchParams }: Props) {
                   className="group flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 hover:shadow-md transition print:break-inside-avoid print:border print:border-gray-200"
                 >
                   <div className="relative w-full">
-                    <AvatarDisplay
-                      bodyStyle={u.body_style}
-                      shirtColor={u.shirt_color}
-                      headFrontUrl={u.head_front_url}
+                    <Avatar
+                      row={u}
+                      displayName={u.display_name}
                       scribbleCount={scribbles}
                       size="sm"
                       className="mx-auto group-hover:scale-105 transition-transform"
@@ -180,6 +194,9 @@ export default async function YearbookPage({ searchParams }: Props) {
           .print\\:break-inside-avoid { break-inside: avoid; }
         }
       `}</style>
+      <div className="print:hidden">
+        <BottomNav currentUserId={user.id} />
+      </div>
     </div>
   )
 }

@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireApiUser } from '@/lib/auth/server'
+import { createFixedWindowRateLimiter, rateLimitResponseHeaders } from '@/lib/utils/rateLimit'
+
+const requestLimiter = createFixedWindowRateLimiter({ limit: 6, windowMs: 60_000 })
 
 export async function POST(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { supabase, user } = auth
+  const rate = requestLimiter.check(user.id)
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Wait a moment and try again.' },
+      { status: 429, headers: rateLimitResponseHeaders(rate) },
+    )
+  }
 
   const { owner_id } = await req.json()
   if (!owner_id) return NextResponse.json({ error: 'owner_id required' }, { status: 400 })

@@ -1,6 +1,6 @@
 {
   "name": "scribbl",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "overrides": {
     "postcss": "$postcss"
@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "validate:scribbl-assets": "node --experimental-strip-types scripts/validate-scribbl-assets.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

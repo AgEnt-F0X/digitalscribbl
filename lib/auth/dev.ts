@@ -28,6 +28,8 @@ export function getAvailableDevAuthSlots(env: EnvShape = process.env) {
 }
 
 export function isDevAuthBypassEnabled(env: EnvShape = process.env) {
+  if (env.NODE_ENV === 'production') return false
+
   const flag = (env.DEV_AUTH_BYPASS ?? '').trim().toLowerCase()
   return TRUE_LIKE.has(flag) && getAvailableDevAuthSlots(env).length > 0
 }

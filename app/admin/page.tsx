@@ -1,22 +1,19 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requirePageUser } from '@/lib/auth/server'
+import { requirePageAdmin } from '@/lib/auth/server'
 import { ToggleScribbling, SetDeadline } from './AdminControls'
 import { ROUTES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const { supabase, user } = await requirePageUser()
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
+  const { adminDb: supabase } = await requirePageAdmin()
 
   // Dashboard metrics
   const [
     { count: totalUsers },
     { count: totalScribbles },
     { count: pendingReports },
+    { count: pendingUserReports },
     { count: todayScribbles },
     { data: settings },
     { data: recentScribbles },
@@ -24,6 +21,7 @@ export default async function AdminPage() {
     supabase.from('users').select('id', { count: 'exact', head: true }).eq('onboarding_completed', true),
     supabase.from('scribbles').select('id', { count: 'exact', head: true }).eq('is_hidden', false),
     supabase.from('scribbles').select('id', { count: 'exact', head: true }).eq('is_flagged', true).eq('is_hidden', false),
+    supabase.from('user_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('scribbles').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 86400000).toISOString()),
     supabase.from('platform_settings').select('key, value'),
     supabase.from('scribbles')
@@ -36,9 +34,10 @@ export default async function AdminPage() {
   const settingsMap = Object.fromEntries((settings ?? []).map(s => [s.key, s.value]))
   const scribbling  = settingsMap['scribbling_enabled'] !== false
   const deadline    = settingsMap['deadline_date'] as string | null ?? null
+  const totalModerationItems = (pendingReports ?? 0) + (pendingUserReports ?? 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       {/* Admin nav */}
       <nav className="bg-ink-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -47,12 +46,14 @@ export default async function AdminPage() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/admin/users"       className="hover:text-gray-300 transition">Users</Link>
+          <Link href="/admin/groups"      className="hover:text-gray-300 transition">Groups</Link>
           <Link href="/admin/moderation"  className="hover:text-gray-300 transition">
-            Moderation {(pendingReports ?? 0) > 0 && (
-              <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{pendingReports}</span>
+            Moderation {totalModerationItems > 0 && (
+              <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{totalModerationItems}</span>
             )}
           </Link>
           <Link href="/admin/yearbook"    className="hover:text-gray-300 transition">Yearbook</Link>
+          <Link href="/admin/errors"      className="hover:text-gray-300 transition">Errors</Link>
         </div>
       </nav>
 
@@ -65,7 +66,8 @@ export default async function AdminPage() {
             { label: 'Total students', value: totalUsers ?? 0, icon: '👥' },
             { label: 'Total scribbles', value: totalScribbles ?? 0, icon: '✏️' },
             { label: 'Scribbles today', value: todayScribbles ?? 0, icon: '📅' },
-            { label: 'Flagged (pending)', value: pendingReports ?? 0, icon: '🚩', alert: (pendingReports ?? 0) > 0 },
+            { label: 'Flagged scribbles', value: pendingReports ?? 0, icon: '🚩', alert: (pendingReports ?? 0) > 0 },
+            { label: 'User reports', value: pendingUserReports ?? 0, icon: '⚠️', alert: (pendingUserReports ?? 0) > 0 },
           ].map(m => (
             <div key={m.label} className={`bg-white rounded-xl p-4 border ${m.alert ? 'border-red-200' : 'border-gray-100'}`}>
               <p className="text-2xl">{m.icon}</p>

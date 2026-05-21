@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requirePageUser } from '@/lib/auth/server'
+import { requirePageAdmin } from '@/lib/auth/server'
 import UserActions from './UserActions'
 
 export const dynamic = 'force-dynamic'
@@ -12,11 +11,8 @@ interface Props {
 const PAGE_SIZE = 30
 
 export default async function AdminUsersPage({ searchParams }: Props) {
-  const { supabase, user } = await requirePageUser()
+  const { adminDb: supabase, user } = await requirePageAdmin()
   const filters = await searchParams
-
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
-  if (!me?.is_admin) redirect('/dashboard')
 
   const page = Math.max(0, Number(filters.page ?? 0))
 
@@ -40,7 +36,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
     .select('id', { count: 'exact', head: true })
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper-100">
       {/* Admin nav */}
       <nav className="bg-ink-900 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

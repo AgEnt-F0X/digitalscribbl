@@ -39,6 +39,16 @@ interface UseShirtChannelOptions {
   currentPanel:    Panel
   currentUserId:   string | null
   currentUserName: string | null
+  /**
+   * Free-tier degrade switches (docs/09). Pass server-fetched values from
+   * `getPlatformFlags()`. When true, the matching surface short-circuits
+   * silently — no errors thrown — so the rest of the UI keeps working.
+   *
+   * - disablePresence: skip `channel.track()` and zero viewerCount
+   * - disableBroadcast: drop every outgoing `channel.send()` payload
+   */
+  disablePresence?:  boolean
+  disableBroadcast?: boolean
 }
 
 interface UseShirtChannelReturn {
@@ -73,6 +83,8 @@ export function useShirtChannel({
   currentPanel,
   currentUserId,
   currentUserName,
+  disablePresence = false,
+  disableBroadcast = false,
 }: UseShirtChannelOptions): UseShirtChannelReturn {
   // Create the Supabase client once on mount — not on every render
   const supabaseRef     = useRef(createClient())
@@ -184,7 +196,11 @@ export function useShirtChannel({
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         setIsConnected(true)
-        if (currentUserId) {
+        // Skip presence track when the admin has flipped
+        // disable_realtime_presence — we still subscribe to the channel so
+        // texture_updated broadcasts arrive, just don't claim a slot in the
+        // 200-concurrent ceiling for passive viewers.
+        if (currentUserId && !disablePresence) {
           await channel.track({
             userId:      currentUserId,
             displayName: currentUserName ?? 'Unknown',
@@ -224,7 +240,13 @@ export function useShirtChannel({
 
   // ── Outgoing broadcasts ────────────────────────────────────
 
+  // When disable_realtime_broadcast is on we don't send anything outgoing,
+  // but the channel is still subscribed so incoming texture_updated +
+  // box_planted events from active scribblers still reflect on lurkers.
+  // This is the cheapest knob: cuts message volume to ~0 without dropping
+  // the connection cost itself.
   const broadcastBoxMoved = useCallback((x: number, y: number, w: number, h: number) => {
+    if (disableBroadcast) return
     const now = Date.now()
     if (now - lastBoxMoveRef.current < THROTTLE_BOX_MS) return
     lastBoxMoveRef.current = now
@@ -238,9 +260,10 @@ export function useShirtChannel({
         x, y, w, h,
       },
     })
-  }, [currentUserId, currentUserName, currentPanel])
+  }, [currentUserId, currentUserName, currentPanel, disableBroadcast])
 
   const broadcastBoxPlanted = useCallback((x: number, y: number, w: number, h: number) => {
+    if (disableBroadcast) return
     channelRef.current?.send({
       type:    'broadcast',
       event:   'box_planted',
@@ -251,17 +274,19 @@ export function useShirtChannel({
         x, y, w, h,
       },
     })
-  }, [currentUserId, currentUserName, currentPanel])
+  }, [currentUserId, currentUserName, currentPanel, disableBroadcast])
 
   const broadcastBoxReleased = useCallback(() => {
+    if (disableBroadcast) return
     channelRef.current?.send({
       type:    'broadcast',
       event:   'box_released',
       payload: { userId: currentUserId },
     })
-  }, [currentUserId])
+  }, [currentUserId, disableBroadcast])
 
   const broadcastStroke = useCallback((fabricJson: object) => {
+    if (disableBroadcast) return
     const now = Date.now()
     if (now - lastStrokeRef.current < THROTTLE_STROKE_MS) return
     lastStrokeRef.current = now
@@ -270,15 +295,16 @@ export function useShirtChannel({
       event:   'stroke',
       payload: { userId: currentUserId, fabricJson },
     })
-  }, [currentUserId])
+  }, [currentUserId, disableBroadcast])
 
   const broadcastTextureUpdated = useCallback((panel: Panel) => {
+    if (disableBroadcast) return
     channelRef.current?.send({
       type:    'broadcast',
       event:   'texture_updated',
       payload: { panel },
     })
-  }, [])
+  }, [disableBroadcast])
 
   const setStrokeHandler = useCallback((handler: ((e: StrokeEvent) => void) | null) => {
     strokeHandlerRef.current = handler

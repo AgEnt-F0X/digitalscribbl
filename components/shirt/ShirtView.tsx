@@ -1,21 +1,36 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useShirtChannel } from '@/lib/hooks/useShirtChannel'
-import GhostBoxCanvas from '@/components/scribble/GhostBoxCanvas'
+import { Check, Flag, MapPin, Minus, PenLine, Plus, RotateCcw, Save, Trash2, Users, Wifi, WifiOff, X } from 'lucide-react'
 import DrawingCanvas, { type DrawingCanvasRef, type DrawingTool } from '@/components/scribble/DrawingCanvas'
 import ScribbleToolbar from '@/components/scribble/ScribbleToolbar'
-import { cn } from '@/lib/utils/cn'
+import ShirtShell from '@/components/shirt/ShirtShell'
+import { useShirtChannel } from '@/lib/hooks/useShirtChannel'
+import { clampScribbleBoxToCanvas, hasDrawableFabricJson, type ScribbleBox } from '@/lib/utils/scribbleContract'
 import {
-  SHIRT_W, SHIRT_H, TOOL_PEN, CANVAS_COLORS,
-} from '@/lib/constants'
-import type { Panel } from '@/lib/supabase/types'
-import type { ScribbleRow, ShirtRow } from '@/lib/supabase/types'
+  getShirtTemplate,
+  isBoxInsideDrawableRegion,
+  SHIRT_COORDINATE_SPACE,
+  SHIRT_TEMPLATE_ID,
+} from '@/lib/utils/shirtTemplate'
+import { createActionCooldown } from '@/lib/utils/actionCooldown'
+import { showToast } from '@/lib/hooks/useToast'
+import { CANVAS_COLORS, SHIRT_H, SHIRT_W, TOOL_PEN, TOOL_TEXT } from '@/lib/constants'
+import { cn } from '@/lib/utils/cn'
+import type { Panel, ScribbleRow, ShirtRow } from '@/lib/supabase/types'
 
-// ── Types ─────────────────────────────────────────────────────
+type ScribbleMode = 'browse' | 'drawing'
+type SigningMode = 'direct' | 'compose'
+type SuggestedSpotKind = 'best' | 'big' | 'edge'
 
-type ScribbleMode = 'browse' | 'placement' | 'drawing'
+interface SuggestedSpot {
+  x: number
+  y: number
+  w: number
+  h: number
+  label: string
+}
 
 interface ShirtViewProps {
   shirt:             ShirtRow
@@ -27,11 +42,88 @@ interface ShirtViewProps {
   currentUserName:   string | null
   canScribble:       boolean
   isOwner:           boolean
-  textureUrl?:       string
-  onScribblePlaced?: () => void
+  bodyStyle?:         string
+  shirtColor?:        string
+  headFrontUrl?:      string | null
+  headBackUrl?:       string | null
+  yearbookQuote?:     string | null
+  textureUrl?:        string
+  /** Server-fetched free-tier degrade flags. See docs/09. */
+  disablePresence?:  boolean
+  disableBroadcast?: boolean
+  onScribblePlaced?:  () => void
 }
 
-// ── Component ─────────────────────────────────────────────────
+const ZOOM_LEVELS = [1, 1.35, 1.75, 2.25, 3]
+const QUICK_EMOJI = '🫶'
+const COMPOSE_BOX_SIZE = { w: 180, h: 130 }
+
+function defaultComposeBox(): ScribbleBox {
+  return {
+    x: Math.round((SHIRT_W - COMPOSE_BOX_SIZE.w) / 2),
+    y: 250,
+    ...COMPOSE_BOX_SIZE,
+  }
+}
+
+function overlapArea(a: SuggestedSpot, b: Pick<ScribbleRow, 'x' | 'y' | 'w' | 'h'>) {
+  const left = Math.max(a.x, b.x)
+  const right = Math.min(a.x + a.w, b.x + b.w)
+  const top = Math.max(a.y, b.y)
+  const bottom = Math.min(a.y + a.h, b.y + b.h)
+
+  return Math.max(0, right - left) * Math.max(0, bottom - top)
+}
+
+function findSuggestedSpot(
+  kind: SuggestedSpotKind,
+  panel: Panel,
+  scribbles: Pick<ScribbleRow, 'x' | 'y' | 'w' | 'h'>[],
+): SuggestedSpot {
+  const size = kind === 'big'
+    ? { w: 180, h: 130 }
+    : kind === 'edge'
+      ? { w: 92, h: 82 }
+      : { w: 126, h: 92 }
+
+  const candidates: SuggestedSpot[] = []
+
+  if (kind === 'edge') {
+    const y = panel === 'sleeves' ? 170 : 150
+    candidates.push(
+      { x: 22, y, w: size.w, h: size.h, label: 'left edge' },
+      { x: SHIRT_W - size.w - 22, y, w: size.w, h: size.h, label: 'right edge' },
+      { x: 34, y: y + 74, w: size.w, h: size.h, label: 'lower left edge' },
+      { x: SHIRT_W - size.w - 34, y: y + 74, w: size.w, h: size.h, label: 'lower right edge' },
+    )
+  } else {
+    const yMin = panel === 'front' ? 122 : 96
+    const yMax = SHIRT_H - size.h - 54
+    const step = kind === 'big' ? 44 : 34
+
+    for (let y = yMin; y <= yMax; y += step) {
+      for (let x = 42; x <= SHIRT_W - size.w - 42; x += step) {
+        candidates.push({ x, y, w: size.w, h: size.h, label: kind === 'big' ? 'wide note spot' : 'open spot' })
+      }
+    }
+  }
+
+  return candidates
+    .map(candidate => {
+      const overlap = scribbles.reduce((total, scribble) => total + overlapArea(candidate, scribble), 0)
+      const centerX = candidate.x + candidate.w / 2
+      const centerY = candidate.y + candidate.h / 2
+      const centrality = Math.abs(centerX - SHIRT_W / 2) * 0.4 + Math.abs(centerY - SHIRT_H * 0.43) * 0.2
+      return { candidate, score: overlap * 12 + centrality }
+    })
+    .sort((a, b) => a.score - b.score)[0]?.candidate ?? {
+      x: 80,
+      y: 160,
+      w: size.w,
+      h: size.h,
+      label: 'open spot',
+    }
+}
 
 export default function ShirtView({
   shirt,
@@ -43,32 +135,56 @@ export default function ShirtView({
   currentUserName,
   canScribble,
   isOwner,
-  textureUrl,
+  bodyStyle = 'M1',
+  shirtColor = '#F8F8F8',
+  headFrontUrl,
+  headBackUrl,
+  yearbookQuote,
   onScribblePlaced,
+  disablePresence = false,
+  disableBroadcast = false,
 }: ShirtViewProps) {
   const router = useRouter()
-
-  const [mode,       setMode]       = useState<ScribbleMode>('browse')
-  const [tool,       setTool]       = useState<DrawingTool>(TOOL_PEN)
-  const [color,      setColor]      = useState<string>(CANVAS_COLORS[0])
-  const [brushSize,  setBrushSize]  = useState(4)
-  const [opacity,    setOpacity]    = useState(1)
-  const [fillShapes, setFillShapes] = useState(false)
-  const [fontSize,   setFontSize]   = useState<'sm' | 'md' | 'lg'>('md')
-  const [fontStyle,  setFontStyle]  = useState<'normal' | 'bold' | 'italic'>('normal')
-  const [isPlacing,  setIsPlacing]  = useState(false)
-  const [plantedBox, setPlantedBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const [error,      setError]      = useState<string | null>(null)
-
-  // Local removed/reported scribble IDs for optimistic UI
-  const [removedIds,  setRemovedIds]  = useState<Set<string>>(new Set())
-  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set())
-  const [hoveredId,   setHoveredId]   = useState<string | null>(null)
-  const [removeError, setRemoveError] = useState<string | null>(null)
-
   const drawingRef = useRef<DrawingCanvasRef>(null)
+  const studioScrollRef = useRef<HTMLDivElement>(null)
+  const actionCooldownRef = useRef(createActionCooldown({ cooldownMs: 900 }))
 
-  // Ctrl+Z / Cmd+Z shortcut while in drawing mode
+  const [mode, setMode] = useState<ScribbleMode>('browse')
+  const [signingMode, setSigningMode] = useState<SigningMode>('direct')
+  const [tool, setTool] = useState<DrawingTool>(TOOL_PEN)
+  const [color, setColor] = useState<string>(CANVAS_COLORS[0])
+  const [brushSize, setBrushSize] = useState(4)
+  const [opacity, setOpacity] = useState(1)
+  const [fillShapes, setFillShapes] = useState(false)
+  const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md')
+  const [fontStyle, setFontStyle] = useState<'normal' | 'bold' | 'italic'>('normal')
+  const [zoomIndex, setZoomIndex] = useState(0)
+  const [showAvatarInStudio, setShowAvatarInStudio] = useState(true)
+  const [hasDrawing, setHasDrawing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set())
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [focusSpot, setFocusSpot] = useState<SuggestedSpot | null>(null)
+  const [draftJson, setDraftJson] = useState<object | null>(null)
+  const [composeBox, setComposeBox] = useState<ScribbleBox>(() => defaultComposeBox())
+
+  const {
+    viewerCount,
+    isConnected,
+    broadcastTextureUpdated,
+  } = useShirtChannel({
+    ownerId,
+    shirtNumber: shirt.shirt_number,
+    currentPanel: panel,
+    currentUserId,
+    currentUserName,
+    disablePresence,
+    disableBroadcast,
+  })
+
   useEffect(() => {
     if (mode !== 'drawing') return
     const handler = (e: KeyboardEvent) => {
@@ -81,389 +197,668 @@ export default function ShirtView({
     return () => window.removeEventListener('keydown', handler)
   }, [mode])
 
-  // ── Realtime channel ──────────────────────────────────────
-  const {
-    ghostBoxes,
-    viewerCount,
-    textureVersion,
-    isConnected,
-    broadcastBoxMoved,
-    broadcastBoxPlanted,
-    broadcastBoxReleased,
-    broadcastStroke,
-    broadcastTextureUpdated,
-    setStrokeHandler,
-  } = useShirtChannel({
-    ownerId,
-    shirtNumber:     shirt.shirt_number,
-    currentPanel:    panel,
-    currentUserId,
-    currentUserName,
-  })
+  const displayedScribbles = existingScribbles.filter(s => !removedIds.has(s.id))
+  const headUrl = panel === 'back' ? (headBackUrl ?? headFrontUrl) : headFrontUrl
+  const zoom = ZOOM_LEVELS[zoomIndex]
+  const shirtTemplate = getShirtTemplate(panel)
+  const draftKeyFor = useCallback((nextMode: SigningMode) => (
+    `scribbl:draft:${ownerId}:${shirt.shirt_number}:${panel}:${currentUserId ?? 'guest'}:${nextMode}`
+  ), [currentUserId, ownerId, panel, shirt.shirt_number])
+  const draftKey = draftKeyFor(signingMode)
 
-  // Wire stroke handler to DrawingCanvas
-  const handleStrokeHandlerRequest = useCallback((handler: Parameters<typeof setStrokeHandler>[0]) => {
-    setStrokeHandler(handler)
-  }, [setStrokeHandler])
+  const panelOccupancy: Record<Panel, number> = {
+    front: Number(shirt.front_occupancy ?? 0),
+    back: Number(shirt.back_occupancy ?? 0),
+    sleeves: Number(shirt.sleeves_occupancy ?? 0),
+  }
 
-  // ── Placement ─────────────────────────────────────────────
-  const enterPlacementMode = () => setMode('placement')
+  const panelTitle: Record<Panel, string> = {
+    front: 'Front shirt',
+    back: 'Back shirt',
+    sleeves: 'Sleeve canvas',
+  }
 
-  const handlePlant = useCallback((box: { x: number; y: number; w: number; h: number }) => {
-    setPlantedBox(box)
+  const panelNote: Record<Panel, string> = {
+    front: 'Sign where the shirt would actually be signed.',
+    back: 'Best for bigger farewell notes and inside jokes.',
+    sleeves: 'Small marks, initials, icons, and quick emojis.',
+  }
+
+  const enterStudio = useCallback(() => {
+    const nextMode: SigningMode = 'direct'
+    const nextDraftKey = draftKeyFor(nextMode)
+    const savedDraft = typeof window !== 'undefined' ? window.localStorage.getItem(nextDraftKey) : null
+    let restoredHasDrawing = false
+    setSigningMode(nextMode)
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft) as object
+        setDraftJson(hasDrawableFabricJson(parsed) ? parsed : null)
+        if (hasDrawableFabricJson(parsed)) {
+          restoredHasDrawing = true
+          showToast({ tone: 'info', title: 'Draft restored', body: 'Your unsaved mark is back on the canvas.' })
+        }
+      } catch {
+        setDraftJson(null)
+      }
+    } else {
+      setDraftJson(null)
+    }
     setMode('drawing')
-    broadcastBoxPlanted(box.x, box.y, box.w, box.h)
-  }, [broadcastBoxPlanted])
+    setZoomIndex(1)
+    setTool(TOOL_PEN)
+    setHasDrawing(restoredHasDrawing)
+    setError(null)
+    setFocusSpot(null)
+    setComposeBox(findSuggestedSpot('big', panel, displayedScribbles))
+  }, [displayedScribbles, draftKeyFor, panel])
 
-  const handleCancel = useCallback(() => {
+  const cancelStudio = useCallback(() => {
     setMode('browse')
-    setPlantedBox(null)
-    broadcastBoxReleased()
-  }, [broadcastBoxReleased])
+    setZoomIndex(0)
+    setHasDrawing(false)
+    setError(null)
+    setFocusSpot(null)
+    setDraftJson(null)
+    if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey)
+  }, [draftKey])
 
-  // ── Commit scribble ───────────────────────────────────────
-  const handlePlace = useCallback(async () => {
-    if (!plantedBox || !drawingRef.current) return
-    setIsPlacing(true)
+  const switchSigningMode = useCallback((nextMode: SigningMode) => {
+    setSigningMode(nextMode)
+    setTool(TOOL_PEN)
+    setError(null)
+    setFocusSpot(null)
+    const nextDraftKey = draftKeyFor(nextMode)
+    const savedDraft = typeof window !== 'undefined' ? window.localStorage.getItem(nextDraftKey) : null
+    if (!savedDraft) {
+      setDraftJson(null)
+      setHasDrawing(false)
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(savedDraft) as object
+      const drawable = hasDrawableFabricJson(parsed)
+      setDraftJson(drawable ? parsed : null)
+      setHasDrawing(drawable)
+      if (drawable) {
+        showToast({
+          tone: 'info',
+          title: nextMode === 'direct' ? 'Direct draft restored' : 'Compose draft restored',
+          body: 'Your unsaved mark is back on the canvas.',
+        })
+      }
+    } catch {
+      setDraftJson(null)
+      setHasDrawing(false)
+    }
+  }, [draftKeyFor])
+
+  const handleLocalStroke = useCallback((fabricJson: object) => {
+    const drawable = hasDrawableFabricJson(fabricJson)
+    setHasDrawing(drawable)
+    if (drawable) setFocusSpot(null)
+    if (typeof window === 'undefined') return
+    if (drawable) {
+      window.localStorage.setItem(draftKey, JSON.stringify(fabricJson))
+    } else {
+      window.localStorage.removeItem(draftKey)
+    }
+  }, [draftKey])
+
+  const focusSuggestedSpot = useCallback((kind: SuggestedSpotKind) => {
+    const spot = findSuggestedSpot(kind, panel, displayedScribbles)
+    const nextZoomIndex = kind === 'big' ? 2 : 1
+
+    setFocusSpot(spot)
+    setComposeBox(spot)
+    setZoomIndex(nextZoomIndex)
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const scrollEl = studioScrollRef.current
+        if (!scrollEl) return
+
+        const scaleX = scrollEl.scrollWidth / SHIRT_W
+        const scaleY = scrollEl.scrollHeight / SHIRT_H
+        const left = (spot.x + spot.w / 2) * scaleX - scrollEl.clientWidth / 2
+        const top = (spot.y + spot.h / 2) * scaleY - scrollEl.clientHeight / 2
+
+        scrollEl.scrollTo({
+          left: Math.max(0, left),
+          top:  Math.max(0, top),
+          behavior: 'smooth',
+        })
+      })
+    })
+  }, [displayedScribbles, panel])
+
+  const handleComposePlacement = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (signingMode !== 'compose') return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const point = {
+      x: ((event.clientX - rect.left) / rect.width) * SHIRT_W,
+      y: ((event.clientY - rect.top) / rect.height) * SHIRT_H,
+    }
+    const candidate = clampScribbleBoxToCanvas({
+      x: point.x - composeBox.w / 2,
+      y: point.y - composeBox.h / 2,
+      w: composeBox.w,
+      h: composeBox.h,
+    }, { maxSize: 260 })
+
+    if (!isBoxInsideDrawableRegion(candidate, panel)) {
+      setError('Place the note inside the shirt body, away from the collar and edges.')
+      showToast({ tone: 'warning', title: 'Choose a shirt area', body: 'Notes need to sit inside the drawable shirt region.' })
+      return
+    }
+
+    setError(null)
+    setFocusSpot({ ...candidate, label: 'composed note spot' })
+    setComposeBox(candidate)
+  }, [composeBox.h, composeBox.w, panel, signingMode])
+
+  const handleSaveScribble = useCallback(async () => {
+    if (!drawingRef.current) return
+    if (!actionCooldownRef.current.canRun(`save:${draftKey}`)) {
+      showToast({ tone: 'warning', title: 'Saving already queued', body: 'Wait a moment before trying again.' })
+      return
+    }
+    setIsSaving(true)
     setError(null)
 
     try {
-      const svgContent = drawingRef.current.exportSvg()
-      const canvasJson = drawingRef.current.exportJson()
+      const layer = await drawingRef.current.exportLayer({ fullCanvas: signingMode === 'compose' })
+      if (!layer || drawingRef.current.isEmpty()) {
+        setError('Draw or add something before saving.')
+        setIsSaving(false)
+        return
+      }
 
-      if (!svgContent || svgContent.trim() === '') {
-        setError('Canvas is empty — draw something first!')
-        setIsPlacing(false)
+      const saveBox = signingMode === 'direct' ? layer.box : composeBox
+      if (signingMode === 'compose' && !isBoxInsideDrawableRegion(saveBox, panel)) {
+        setError('Move the composed note inside the shirt before saving.')
+        setIsSaving(false)
         return
       }
 
       const res = await fetch('/api/scribble/place', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          owner_id:     ownerId,
+        body: JSON.stringify({
+          placement_mode: signingMode,
+          template_id: SHIRT_TEMPLATE_ID,
+          coordinate_space: SHIRT_COORDINATE_SPACE,
+          owner_id: ownerId,
           shirt_number: shirt.shirt_number,
           panel,
-          x: plantedBox.x,
-          y: plantedBox.y,
-          w: plantedBox.w,
-          h: plantedBox.h,
-          canvas_svg:  svgContent,
-          canvas_json: canvasJson,
+          x: saveBox.x,
+          y: saveBox.y,
+          w: saveBox.w,
+          h: saveBox.h,
+          canvas_svg: layer.canvasSvg,
+          canvas_json: layer.canvasJson,
         }),
       })
 
       if (!res.ok) {
-        const body = await res.json()
-        if (body.code === 'COLLISION') {
-          setError('Someone just placed a scribble there — try a different spot.')
-        } else {
-          setError(body.error ?? 'Something went wrong')
+        const body = await res.json().catch(() => ({}))
+        const messages: Record<string, string> = {
+          EMPTY_CANVAS: 'Draw or add something before saving.',
+          INVALID_BOX: 'That mark could not be placed on the shirt. Try a smaller area.',
+          DIRECT_LAYER_REQUIRED: 'Direct drawing must be saved as a clipped shirt layer. Refresh and try again.',
+          INVALID_SVG: 'This drawing could not be saved safely. Try clearing and drawing again.',
+          FORBIDDEN: body.error ?? 'You cannot scribble on this shirt right now.',
+          SAVE_FAILED: 'Failed to save scribble. Please try again.',
+          RATE_LIMITED: 'Too many save attempts. Wait a moment and try again.',
         }
-        setIsPlacing(false)
+        setError(messages[String(body.code)] ?? body.error ?? 'Something went wrong')
+        setIsSaving(false)
         return
       }
 
-      broadcastBoxReleased()
-      // Notify all viewers the texture changed
       broadcastTextureUpdated(panel)
+      if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey)
+      showToast({ tone: 'success', title: 'Scribble saved', body: `${ownerName}'s shirt was updated.` })
       setMode('browse')
-      setPlantedBox(null)
+      setZoomIndex(0)
+      setHasDrawing(false)
       onScribblePlaced?.()
-      // Refresh server data (new scribble bounding box appears, texture URL updates)
       router.refresh()
     } catch {
-      setError('Network error — please try again')
+      setError('Network error. Please try again.')
+      showToast({ tone: 'error', title: 'Network error', body: 'Your drawing draft is still saved locally.' })
     } finally {
-      setIsPlacing(false)
+      setIsSaving(false)
     }
-  }, [plantedBox, ownerId, shirt.shirt_number, panel, broadcastBoxReleased, broadcastTextureUpdated, onScribblePlaced, router])
+  }, [broadcastTextureUpdated, composeBox, draftKey, onScribblePlaced, ownerId, ownerName, panel, router, shirt.shirt_number, signingMode])
 
-  // ── Remove scribble (owner action) ───────────────────────
   const handleRemoveScribble = useCallback(async (scribbleId: string) => {
-    // Optimistic — hide immediately
     setRemovedIds(prev => new Set([...prev, scribbleId]))
     setRemoveError(null)
 
     const res = await fetch('/api/scribble/remove', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ scribble_id: scribbleId }),
+      body: JSON.stringify({ scribble_id: scribbleId }),
     })
 
     if (res.ok) {
       broadcastTextureUpdated(panel)
+      showToast({ tone: 'success', title: 'Scribble removed' })
       router.refresh()
     } else {
-      // Rollback on failure
       setRemovedIds(prev => { const next = new Set(prev); next.delete(scribbleId); return next })
-      setRemoveError('Could not remove scribble — try again.')
+      setRemoveError('Could not remove scribble. Try again.')
+      showToast({ tone: 'error', title: 'Could not remove scribble' })
     }
-  }, [panel, broadcastTextureUpdated, router])
+  }, [broadcastTextureUpdated, panel, router])
 
-  // ── Report scribble ───────────────────────────────────────
   const handleReportScribble = useCallback(async (scribbleId: string) => {
     if (reportedIds.has(scribbleId)) return
+    if (!actionCooldownRef.current.canRun(`report:${scribbleId}`)) return
     setReportedIds(prev => new Set([...prev, scribbleId]))
-    await fetch('/api/scribble/report', {
-      method:  'POST',
+    const res = await fetch('/api/scribble/report', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ scribble_id: scribbleId }),
+      body: JSON.stringify({ scribble_id: scribbleId }),
+    })
+    showToast({
+      tone: res.ok || res.status === 409 ? 'success' : 'error',
+      title: res.ok || res.status === 409 ? 'Report received' : 'Could not report scribble',
     })
   }, [reportedIds])
 
-  // Filter out optimistically-removed scribbles
-  const displayedScribbles = existingScribbles.filter(s => !removedIds.has(s.id))
+  const renderSavedScribbles = (interactive: boolean) => (
+    <>
+      {displayedScribbles.filter(s => s.canvas_svg).map(s => (
+        <div
+          key={s.id}
+          aria-hidden
+          className="absolute bg-contain bg-center bg-no-repeat"
+          style={{
+            left: `${(s.x / SHIRT_W) * 100}%`,
+            top: `${(s.y / SHIRT_H) * 100}%`,
+            width: `${(s.w / SHIRT_W) * 100}%`,
+            height: `${(s.h / SHIRT_H) * 100}%`,
+            backgroundImage: `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.canvas_svg!)}")`,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
 
-  // ── Render ────────────────────────────────────────────────
-  return (
-    <div className="flex flex-col md:flex-row gap-4 items-start">
-      {/* Shirt canvas area */}
-      <div className="flex-1 relative">
-        {/* Live presence indicator */}
-        <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
-          <span className={cn(
-            'inline-block w-2 h-2 rounded-full',
-            isConnected ? 'bg-green-400' : 'bg-gray-300'
-          )} />
-          {viewerCount > 0 ? `${viewerCount} people viewing this shirt` : 'Just you here'}
-          {ghostBoxes.size > 0 && (
-            <span className="text-scribble-purple font-medium">
-              · {ghostBoxes.size} scribbling now
+      {interactive && displayedScribbles.map(s => {
+        const isHovered = hoveredId === s.id
+        const isReported = reportedIds.has(s.id)
+
+        return (
+          <button
+            key={s.id}
+            type="button"
+            aria-label={isOwner ? 'Remove scribble' : 'Report scribble'}
+            className={cn('absolute rounded-sm border transition', isHovered ? 'border-black/25 bg-black/5' : 'border-transparent bg-transparent')}
+            style={{
+              left: `${(s.x / SHIRT_W) * 100}%`,
+              top: `${(s.y / SHIRT_H) * 100}%`,
+              width: `${(s.w / SHIRT_W) * 100}%`,
+              height: `${(s.h / SHIRT_H) * 100}%`,
+            }}
+            onPointerEnter={() => setHoveredId(s.id)}
+            onPointerLeave={() => setHoveredId(null)}
+            onClick={() => {
+              if (isOwner) handleRemoveScribble(s.id)
+              else handleReportScribble(s.id)
+            }}
+          >
+            <span className={cn(
+              'absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition',
+              isOwner ? 'bg-red-600' : isReported ? 'bg-green-600' : 'bg-amber-500',
+              isHovered ? 'opacity-100' : 'opacity-75'
+            )}>
+              {isOwner ? <Trash2 size={13} /> : isReported ? <Check size={13} /> : <Flag size={13} />}
             </span>
-          )}
+          </button>
+        )
+      })}
+    </>
+  )
+
+  return (
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-[28px] border border-black/10 bg-[#f8f5ee] shadow-[0_24px_70px_rgba(45,35,22,0.08)]">
+        <div className="flex flex-col gap-3 border-b border-black/10 bg-white/55 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-display text-xl font-bold text-ink-900">{panelTitle[panel]}</h2>
+              <span className="rounded-full bg-ink-900 px-2.5 py-1 text-[11px] font-semibold text-white">
+                {Math.round(panelOccupancy[panel])}% filled
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">{panelNote[panel]}</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-2.5 py-1">
+              {isConnected ? <Wifi size={13} className="text-green-500" /> : <WifiOff size={13} className="text-gray-400" />}
+              {viewerCount > 0 ? `${viewerCount} live` : 'solo'}
+            </span>
+            {mode === 'browse' && !isOwner && canScribble && (
+              <button
+                onClick={enterStudio}
+                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-ink-700"
+              >
+                <PenLine size={13} />
+                Sign now
+              </button>
+            )}
+            {mode === 'drawing' && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 font-medium text-indigo-700">
+                <Users size={13} />
+                Studio open
+              </span>
+            )}
+          </div>
         </div>
 
-        {mode === 'browse' && (
-          <div className="relative w-full" style={{ aspectRatio: `${SHIRT_W}/${SHIRT_H}` }}>
-            {/* Base shirt area */}
-            {displayedScribbles.length === 0 && (
-              <div className="absolute inset-0 bg-gray-50 rounded-lg flex items-center justify-center">
-                <p className="text-sm text-gray-400">No scribbles yet — be the first!</p>
+        <div className="p-3 sm:p-5">
+          <ShirtShell
+            shirtColor={shirtColor}
+            headUrl={headUrl}
+            panel={panel}
+            showHead={mode === 'browse' || showAvatarInStudio}
+            className={cn(mode === 'drawing' && !showAvatarInStudio ? 'max-w-[760px]' : 'max-w-[640px]')}
+          >
+            {mode === 'browse' && (
+              <div className="absolute inset-0">
+                {displayedScribbles.length === 0 && (
+                  <div className="absolute inset-4 flex items-center justify-center rounded-2xl border border-dashed border-black/15 text-center text-black/40">
+                    <p className="max-w-[190px] text-xs font-medium">
+                      Nobody has signed this surface yet. Be the first mark on the fabric.
+                    </p>
+                  </div>
+                )}
+                {renderSavedScribbles(isOwner || canScribble)}
               </div>
             )}
 
-            {/* SVG scribble overlays — each scribble rendered at its bounding box */}
-            {displayedScribbles.filter(s => s.canvas_svg).map(s => (
-              <img
-                key={s.id}
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.canvas_svg!)}`}
-                alt=""
-                draggable={false}
-                style={{
-                  position: 'absolute',
-                  left:   `${(s.x / SHIRT_W) * 100}%`,
-                  top:    `${(s.y / SHIRT_H) * 100}%`,
-                  width:  `${(s.w / SHIRT_W) * 100}%`,
-                  height: `${(s.h / SHIRT_H) * 100}%`,
-                  pointerEvents: 'none',
-                  userSelect: 'none',
-                }}
-              />
-            ))}
-
-            {/* Other users' ghost boxes */}
-            {ghostBoxes.size > 0 && (
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${SHIRT_W} ${SHIRT_H}`}>
-                {[...ghostBoxes.values()].filter(g => g.panel === panel).map(g => (
-                  <g key={g.userId}>
-                    <rect
-                      x={g.x} y={g.y} width={g.w} height={g.h}
-                      fill={g.isPlanted ? 'rgba(80,80,200,0.1)' : 'rgba(150,150,255,0.08)'}
-                      stroke={g.isPlanted ? 'rgba(80,80,200,0.7)' : 'rgba(150,150,255,0.5)'}
-                      strokeWidth="1.5"
-                      strokeDasharray={g.isPlanted ? undefined : '4 4'}
-                      className="transition-all duration-75"
-                      style={{ transform: 'translateZ(0)' }}
-                    />
-                    <text x={g.x + 4} y={g.y + 14} fontSize="10" fill="rgba(60,60,180,0.9)" fontWeight="bold">
-                      {g.displayName}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-            )}
-
-            {/* ── Scribble interaction overlays ── */}
-            {/* Owner: remove button; Others: report button */}
-            {displayedScribbles.length > 0 && (isOwner || canScribble) && (
-              <svg
-                className="absolute inset-0 w-full h-full"
-                viewBox={`0 0 ${SHIRT_W} ${SHIRT_H}`}
-                style={{ pointerEvents: 'auto' }}
+            {mode === 'drawing' && (
+              <div
+                ref={studioScrollRef}
+                className="absolute inset-0 overflow-auto bg-white/0"
+                style={{ touchAction: signingMode === 'compose' ? 'none' : 'pan-x pan-y' }}
               >
-                {displayedScribbles.map(s => {
-                  const isHovered   = hoveredId === s.id
-                  const isReported  = reportedIds.has(s.id)
-                  const btnColor    = isOwner ? 'rgba(220,38,38,0.88)' : 'rgba(245,158,11,0.88)'
-                  const btnLabel    = isOwner ? '×' : (isReported ? '✓' : '🚩')
-
-                  return (
-                    <g
-                      key={s.id}
-                      onMouseEnter={() => setHoveredId(s.id)}
-                      onMouseLeave={() => setHoveredId(null)}
-                      style={{ cursor: isHovered ? 'pointer' : 'default' }}
+                <div
+                  className="relative min-h-full min-w-full"
+                  style={{
+                    width: `${zoom * 100}%`,
+                    height: `${zoom * 100}%`,
+                  }}
+                >
+                  {renderSavedScribbles(false)}
+                  {signingMode === 'compose' && (
+                    <div
+                      className="absolute inset-0 z-20 cursor-crosshair"
+                      onPointerDown={handleComposePlacement}
+                      aria-label="Choose where to place your composed note"
+                    />
+                  )}
+                  {(focusSpot || signingMode === 'compose') && (
+                    <div
+                      className="pointer-events-none absolute z-30 rounded-2xl border-2 border-ink-900/50 bg-ink-900/5 shadow-[0_0_0_9999px_rgba(255,255,255,0.18)]"
+                      style={{
+                        left: `${((signingMode === 'compose' ? composeBox.x : focusSpot!.x) / SHIRT_W) * 100}%`,
+                        top: `${((signingMode === 'compose' ? composeBox.y : focusSpot!.y) / SHIRT_H) * 100}%`,
+                        width: `${((signingMode === 'compose' ? composeBox.w : focusSpot!.w) / SHIRT_W) * 100}%`,
+                        height: `${((signingMode === 'compose' ? composeBox.h : focusSpot!.h) / SHIRT_H) * 100}%`,
+                      }}
                     >
-                      {/* Hit area + hover highlight */}
-                      <rect
-                        x={s.x} y={s.y} width={s.w} height={s.h}
-                        fill={isHovered ? 'rgba(0,0,0,0.06)' : 'transparent'}
-                        stroke={isHovered ? 'rgba(0,0,0,0.18)' : 'transparent'}
-                        strokeWidth="1"
-                        rx="2"
-                        style={{ pointerEvents: 'all' }}
-                      />
-                      {/* Action button — visible on hover */}
-                      {isHovered && (
-                        <g
-                          onClick={() => {
-                            if (isOwner) handleRemoveScribble(s.id)
-                            else         handleReportScribble(s.id)
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <rect
-                            x={s.x + s.w - 18} y={s.y + 2}
-                            width={16} height={16}
-                            rx={3}
-                            fill={isReported && !isOwner ? 'rgba(34,197,94,0.88)' : btnColor}
-                          />
-                          <text
-                            x={s.x + s.w - 10} y={s.y + 13}
-                            fontSize={isOwner ? 14 : 10}
-                            textAnchor="middle"
-                            fill="white"
-                            fontWeight="bold"
-                            style={{ pointerEvents: 'none', userSelect: 'none' }}
-                          >
-                            {btnLabel}
-                          </text>
-                        </g>
-                      )}
-                    </g>
-                  )
-                })}
-              </svg>
+                      <span className="absolute -top-7 left-0 rounded-full bg-ink-900 px-2 py-1 text-[10px] font-semibold text-white">
+                        {signingMode === 'compose' ? 'composed note spot' : focusSpot!.label}
+                      </span>
+                    </div>
+                  )}
+                  {signingMode === 'direct' && (
+                    <DrawingCanvas
+                      key={draftKey}
+                      ref={drawingRef}
+                      w={SHIRT_W}
+                      h={SHIRT_H}
+                      tool={tool}
+                      color={color}
+                      brushSize={brushSize}
+                      opacity={opacity}
+                      fillShapes={fillShapes}
+                      fontSize={fontSize}
+                      fontStyle={fontStyle}
+                      onStroke={handleLocalStroke}
+                      initialJson={draftJson}
+                      clipPath={shirtTemplate.drawablePath}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </ShirtShell>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-black/10 bg-white/45 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-h-[20px] text-sm">
+            {error && <p className="text-red-600">{error}</p>}
+            {removeError && <p className="text-red-600">{removeError}</p>}
+            {!error && !removeError && mode === 'browse' && (
+              <p className="text-xs text-gray-500">
+                {isOwner
+                  ? 'Tap a saved scribble to remove it from your shirt.'
+                  : canScribble
+                    ? `Open the studio and sign directly on ${ownerName}'s shirt.`
+                    : `${ownerName}'s shirt is view-only for your account right now.`}
+              </p>
+            )}
+            {!error && mode === 'drawing' && (
+              <p className="text-xs text-gray-500">
+                {signingMode === 'direct'
+                  ? 'Direct mode clips every stroke to the shirt SVG region.'
+                  : 'Compose mode saves your note as a placed layer inside the shirt region.'}
+              </p>
             )}
           </div>
-        )}
 
-        {mode === 'placement' && (
-          <GhostBoxCanvas
-            panel={panel}
-            existingScribbles={existingScribbles}
-            liveGhostBoxes={ghostBoxes}
-            textureUrl={textureUrl}
-            textureVersion={textureVersion}
-            onPlant={handlePlant}
-            onCancel={handleCancel}
-            onBoxMoved={broadcastBoxMoved}
-          />
-        )}
-
-        {mode === 'drawing' && plantedBox && (
-          <div className="relative w-full" style={{ aspectRatio: `${SHIRT_W}/${SHIRT_H}` }}>
-            {/* Background: existing scribbles as SVG overlays (context for the drafter) */}
-            {existingScribbles.filter(s => s.canvas_svg).map(s => (
-              <img
-                key={s.id}
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.canvas_svg!)}`}
-                alt=""
-                draggable={false}
-                style={{
-                  position: 'absolute',
-                  left:   `${(s.x / SHIRT_W) * 100}%`,
-                  top:    `${(s.y / SHIRT_H) * 100}%`,
-                  width:  `${(s.w / SHIRT_W) * 100}%`,
-                  height: `${(s.h / SHIRT_H) * 100}%`,
-                  pointerEvents: 'none',
-                }}
-              />
-            ))}
-            {/* Drawing canvas positioned over planted box */}
-            <div
-              className="absolute border-2 border-ink-900 rounded shadow-lg bg-white/5 animate-box-plant"
-              style={{
-                left:   `${(plantedBox.x / SHIRT_W) * 100}%`,
-                top:    `${(plantedBox.y / SHIRT_H) * 100}%`,
-                width:  `${(plantedBox.w / SHIRT_W) * 100}%`,
-                height: `${(plantedBox.h / SHIRT_H) * 100}%`,
-              }}
+          {mode === 'browse' && !isOwner && canScribble && (
+            <button
+              onClick={enterStudio}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-ink-700"
             >
-              <DrawingCanvas
-                key={`${shirt.id}-${panel}-${plantedBox.x}-${plantedBox.y}-${plantedBox.w}-${plantedBox.h}`}
-                ref={drawingRef}
-                w={plantedBox.w}
-                h={plantedBox.h}
-                tool={tool}
-                color={color}
-                brushSize={brushSize}
-                opacity={opacity}
-                fillShapes={fillShapes}
-                fontSize={fontSize}
-                fontStyle={fontStyle}
-                onStroke={broadcastStroke}
-                onRemoteStroke={handleStrokeHandlerRequest}
-              />
+              <PenLine size={16} />
+              Scribble on this shirt
+            </button>
+          )}
+
+          {mode === 'drawing' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setZoomIndex(i => Math.max(0, i - 1))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-ink-900 transition hover:bg-gray-50"
+                title="Zoom out"
+              >
+                <Minus size={16} />
+              </button>
+              <span className="min-w-[48px] text-center text-xs font-medium text-gray-500">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={() => setZoomIndex(i => Math.min(ZOOM_LEVELS.length - 1, i + 1))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-ink-900 transition hover:bg-gray-50"
+                title="Zoom in"
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                onClick={cancelStudio}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-ink-900 transition hover:bg-gray-50"
+              >
+                <X size={16} />
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveScribble}
+                disabled={isSaving || !hasDrawing}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save size={16} />
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {mode === 'drawing' && (
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => switchSigningMode('direct')}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-xs font-semibold transition',
+                  signingMode === 'direct'
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+                )}
+              >
+                Direct shirt draw
+              </button>
+              <button
+                onClick={() => switchSigningMode('compose')}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-xs font-semibold transition',
+                  signingMode === 'compose'
+                    ? 'border-ink-900 bg-ink-900 text-white'
+                    : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+                )}
+              >
+                Compose then place
+              </button>
+              <span className="text-xs text-gray-500">
+                {signingMode === 'direct'
+                  ? 'Draw like a real shirt signing. The shirt clips the strokes.'
+                  : 'Tap the shirt to place this note, then save it.'}
+              </span>
+            </div>
+
+            {signingMode === 'compose' && (
+              <div className="grid gap-3 rounded-2xl border border-dashed border-black/15 bg-paper-100 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">Compose note</p>
+                  <p className="mt-1 text-xs text-gray-500">This scratch canvas becomes one movable shirt layer.</p>
+                </div>
+                <div className="h-[130px] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-inner">
+                  <DrawingCanvas
+                    key={draftKey}
+                    ref={drawingRef}
+                    w={COMPOSE_BOX_SIZE.w}
+                    h={COMPOSE_BOX_SIZE.h}
+                    tool={tool}
+                    color={color}
+                    brushSize={brushSize}
+                    opacity={opacity}
+                    fillShapes={fillShapes}
+                    fontSize={fontSize}
+                    fontStyle={fontStyle}
+                    onStroke={handleLocalStroke}
+                    initialJson={draftJson}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setTool(TOOL_TEXT)}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              Write my name
+            </button>
+            <button
+              onClick={() => setTool(TOOL_PEN)}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              Draw something
+            </button>
+            <button
+              onClick={() => drawingRef.current?.addEmoji(QUICK_EMOJI)}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              Add {QUICK_EMOJI}
+            </button>
+            <button
+              onClick={() => focusSuggestedSpot('best')}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              <MapPin size={14} />
+              Find open spot
+            </button>
+            <button
+              onClick={() => focusSuggestedSpot('big')}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              Big note area
+            </button>
+            <button
+              onClick={() => focusSuggestedSpot('edge')}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-ink-900 transition hover:bg-gray-50"
+            >
+              Edge mark
+            </button>
+            <button
+              onClick={() => setShowAvatarInStudio(value => !value)}
+              className={cn(
+                'rounded-xl border px-3 py-2 text-xs font-medium transition',
+                showAvatarInStudio
+                  ? 'border-ink-900 bg-ink-900 text-white hover:bg-ink-700'
+                  : 'border-gray-200 bg-white text-ink-900 hover:bg-gray-50'
+              )}
+            >
+              {showAvatarInStudio ? 'Avatar visible' : 'Shirt only'}
+            </button>
+            <button
+              onClick={() => {
+                drawingRef.current?.clear()
+                setHasDrawing(false)
+                setFocusSpot(null)
+              }}
+              className="ml-auto inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-50"
+            >
+              <RotateCcw size={14} />
+              Reset mark
+            </button>
             </div>
           </div>
-        )}
 
-        {error && (
-          <p className="mt-2 text-sm text-red-500">{error}</p>
-        )}
-        {removeError && (
-          <p className="mt-2 text-sm text-red-500">{removeError}</p>
-        )}
-
-        {/* Owner hint when scribbles are present */}
-        {mode === 'browse' && isOwner && displayedScribbles.length > 0 && (
-          <p className="mt-1.5 text-[10px] text-gray-400 text-center">
-            Hover over a scribble and click <strong>×</strong> to remove it
-          </p>
-        )}
-        {mode === 'browse' && !isOwner && canScribble && displayedScribbles.length > 0 && (
-          <p className="mt-1.5 text-[10px] text-gray-400 text-center">
-            Hover over a scribble and click <strong>🚩</strong> to report it
-          </p>
-        )}
-      </div>
-
-      {/* Toolbar (only in drawing mode) */}
-      {mode === 'drawing' && (
-        <ScribbleToolbar
-          tool={tool}
-          color={color}
-          brushSize={brushSize}
-          opacity={opacity}
-          fillShapes={fillShapes}
-          fontSize={fontSize}
-          fontStyle={fontStyle}
-          onTool={setTool}
-          onColor={setColor}
-          onBrushSize={setBrushSize}
-          onOpacity={setOpacity}
-          onFill={setFillShapes}
-          onFontSize={setFontSize}
-          onFontStyle={setFontStyle}
-          onUndo={() => drawingRef.current?.undo()}
-          onClear={() => drawingRef.current?.clear()}
-          onPlace={handlePlace}
-          isPlacing={isPlacing}
-        />
+          <ScribbleToolbar
+            tool={tool}
+            color={color}
+            brushSize={brushSize}
+            opacity={opacity}
+            fillShapes={fillShapes}
+            fontSize={fontSize}
+            fontStyle={fontStyle}
+            onTool={setTool}
+            onColor={setColor}
+            onBrushSize={setBrushSize}
+            onOpacity={setOpacity}
+            onFill={setFillShapes}
+            onFontSize={setFontSize}
+            onFontStyle={setFontStyle}
+            onUndo={() => drawingRef.current?.undo()}
+            onClear={() => drawingRef.current?.clear()}
+            onPlace={handleSaveScribble}
+            onEmoji={emoji => drawingRef.current?.addEmoji(emoji)}
+            isPlacing={isSaving}
+            canPlace={hasDrawing}
+          />
+        </div>
       )}
 
-      {/* Scribble CTA (browse mode only, not owner) */}
-      {mode === 'browse' && !isOwner && canScribble && (
-        <div className="flex flex-col items-start gap-2 pt-8">
-          <button
-            onClick={enterPlacementMode}
-            className="px-4 py-2 bg-ink-900 hover:bg-ink-700 text-white rounded-xl font-medium text-sm transition shadow-sm"
-          >
-            ✏️ Scribble on this shirt
-          </button>
-        </div>
+      {yearbookQuote && mode === 'browse' && (
+        <p className="text-center text-xs italic text-gray-500">&ldquo;{yearbookQuote}&rdquo;</p>
       )}
     </div>
   )

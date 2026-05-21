@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched classroom hall (desktop placeholder)">
+  <defs>
+    <linearGradient id="wall-d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff1cf"/>
+      <stop offset="60%" stop-color="#f5dfaa"/>
+      <stop offset="100%" stop-color="#e8c890"/>
+    </linearGradient>
+    <linearGradient id="floor-d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d6b985"/>
+      <stop offset="100%" stop-color="#a98c5b"/>
+    </linearGradient>
+    <radialGradient id="window-d" cx="0.5" cy="0.45" r="0.5">
+      <stop offset="0%" stop-color="#fff6d9" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#fff6d9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall-d)"/>
+  <path d="M0 720 L 1920 720 L 1920 1080 L 0 1080 Z" fill="url(#floor-d)"/>
+  <path d="M0 0 L 960 460 L 1920 0 Z" fill="#f8e6b7" opacity="0.55"/>
+  <g stroke="#7a6238" stroke-width="2.4" fill="none" opacity="0.65">
+    <path d="M0 0 L 960 460" stroke-linecap="round"/>
+    <path d="M1920 0 L 960 460" stroke-linecap="round"/>
+    <path d="M0 720 L 960 460" stroke-linecap="round"/>
+    <path d="M1920 720 L 960 460" stroke-linecap="round"/>
+  </g>
+  <g stroke="#7a6238" stroke-width="1.8" fill="none" opacity="0.42">
+    <path d="M0 1080 L 960 460"/>
+    <path d="M1920 1080 L 960 460"/>
+    <path d="M300 1080 L 960 460"/>
+    <path d="M1620 1080 L 960 460"/>
+    <path d="M620 1080 L 960 460"/>
+    <path d="M1300 1080 L 960 460"/>
+  </g>
+  <g opacity="0.7">
+    <rect x="760" y="360" width="400" height="200" fill="#fbf8ee" stroke="#8a93a0" stroke-width="6" rx="4"/>
+    <rect x="780" y="380" width="360" height="160" fill="url(#window-d)"/>
+    <path d="M780 480 q 80 -30 150 -10 t 210 -16" stroke="#2563eb" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M820 510 l 60 -14 l -20 26 z" fill="#d83f6b" opacity="0.5"/>
+  </g>
+  <g opacity="0.55" stroke="#5b4524" stroke-width="2.8" fill="#e6cf9a">
+    <rect x="160" y="720" width="260" height="120" rx="6"/>
+    <rect x="160" y="720" width="260" height="36" rx="6" fill="#caa56a"/>
+    <line x1="170" y1="840" x2="170" y2="940" stroke-width="6" stroke-linecap="round"/>
+    <line x1="410" y1="840" x2="410" y2="940" stroke-width="6" stroke-linecap="round"/>
+    <rect x="540" y="730" width="240" height="100" rx="6"/>
+    <line x1="550" y1="830" x2="550" y2="916" stroke-width="6" stroke-linecap="round"/>
+    <line x1="770" y1="830" x2="770" y2="916" stroke-width="6" stroke-linecap="round"/>
+    <rect x="1140" y="730" width="240" height="100" rx="6"/>
+    <line x1="1150" y1="830" x2="1150" y2="916" stroke-width="6" stroke-linecap="round"/>
+    <line x1="1370" y1="830" x2="1370" y2="916" stroke-width="6" stroke-linecap="round"/>
+    <rect x="1500" y="720" width="260" height="120" rx="6"/>
+    <rect x="1500" y="720" width="260" height="36" rx="6" fill="#caa56a"/>
+    <line x1="1510" y1="840" x2="1510" y2="940" stroke-width="6" stroke-linecap="round"/>
+    <line x1="1750" y1="840" x2="1750" y2="940" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.4" stroke="#3D2E14" stroke-width="1.5" fill="none">
+    <path d="M210 980 l 14 -22 l 14 22"/>
+    <path d="M1560 980 l 14 -22 l 14 22"/>
+  </g>
+</svg>

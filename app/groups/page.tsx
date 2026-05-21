@@ -1,8 +1,13 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requirePageUser } from '@/lib/auth/server'
-import AvatarDisplay from '@/components/avatar/AvatarDisplay'
+import Avatar from '@/components/avatar/Avatar'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import BottomNav from '@/components/nav/BottomNav'
+import PlaceBackground from '@/components/place/PlaceBackground'
+import Whiteboard from '@/components/brand/Whiteboard'
+import AsteriskDivider from '@/components/marginalia/AsteriskDivider'
+import HandDrawnArrow from '@/components/marginalia/HandDrawnArrow'
 import { CreateGroupForm, JoinGroupForm } from './CreateGroupForm'
 import { ROUTES } from '@/lib/constants'
 
@@ -13,13 +18,12 @@ export default async function GroupsPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('display_name, body_style, shirt_color, head_front_url')
+    .select('display_name, body_style, shirt_color, head_front_url, avatar_config')
     .eq('id', user.id)
     .single()
 
   if (!profile) redirect('/onboarding')
 
-  // Groups the user belongs to, with member count and group info
   const { data: memberships } = await supabase
     .from('friend_group_members')
     .select(`
@@ -30,7 +34,6 @@ export default async function GroupsPage() {
     .eq('user_id', user.id)
     .order('joined_at', { ascending: false })
 
-  // Get member counts per group
   const groupIds = (memberships ?? []).map(m => m.group_id)
   const { data: memberCounts } = groupIds.length
     ? await supabase
@@ -51,75 +54,103 @@ export default async function GroupsPage() {
   }))
 
   return (
-    <div className="min-h-screen bg-cream-50">
-      <nav className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
-        <div className="flex items-center gap-3">
-          <Link href={ROUTES.explore} className="text-sm text-gray-500 hover:text-ink-900 transition">Explore</Link>
-          <NotificationBell userId={user.id} />
-          <Link href={ROUTES.profile(user.id)}>
-            <AvatarDisplay
-              bodyStyle={profile.body_style}
-              shirtColor={profile.shirt_color}
-              headFrontUrl={profile.head_front_url}
-              size="sm"
-            />
-          </Link>
-        </div>
-      </nav>
+    <div className="scribbl-page relative min-h-screen pb-24 md:pb-0">
+      {/* Lawn place layer — ambient only on groups (doc 18 § 3). */}
+      <PlaceBackground surface="groups" illustration="lawn-golden-hour" alwaysAmbient />
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold text-ink-900">Friend groups</h1>
-          <div className="flex gap-2">
-            <JoinGroupForm />
-            <CreateGroupForm />
+      <div className="relative z-10">
+        <nav className="sticky top-0 z-30 border-b border-[color:var(--line-soft)] bg-paper-100/88 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-3xl items-center justify-between">
+            <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
+            <div className="flex items-center gap-3">
+              <Link href={ROUTES.explore} className="text-sm text-ink-500 hover:text-ink-900 transition">Explore</Link>
+              <NotificationBell userId={user.id} />
+              <Link href={ROUTES.profile(user.id)}>
+                <Avatar
+                  row={profile}
+                  displayName={profile.display_name}
+                  size="sm"
+                />
+              </Link>
+            </div>
           </div>
-        </div>
+        </nav>
 
-        {groups.length === 0 ? (
-          <div className="card p-12 text-center">
-            <p className="text-5xl mb-4">👥</p>
-            <h2 className="text-lg font-semibold text-ink-900 mb-2">No groups yet</h2>
-            <p className="text-sm text-gray-400 mb-6">
-              Create a group with your closest friends, or join one with an invite link.
-            </p>
-            <div className="flex gap-3 justify-center">
+        <main className="mx-auto max-w-2xl px-4 py-8">
+          <header className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-eyebrow-uppercase">Wings & circles</p>
+              <h1 className="text-hero-display mt-2">Friend groups</h1>
+              <p className="text-nostalgia mt-2">A name on a whiteboard. The people show up.</p>
+            </div>
+            <div className="flex gap-2">
               <JoinGroupForm />
               <CreateGroupForm />
             </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {groups.map(g => (
-              <Link
-                key={g.id}
-                href={ROUTES.group(g.id)}
-                className="card p-5 flex items-center gap-4 hover:shadow-md transition group"
-              >
-                {/* Group icon */}
-                <div className="w-12 h-12 rounded-full bg-ink-900 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                  {g.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-ink-900 truncate">{g.name}</h3>
-                    {g.isAdmin && (
-                      <span className="text-[10px] bg-ink-900 text-white px-2 py-0.5 rounded-full flex-shrink-0">
-                        admin
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {g.memberCount} member{g.memberCount !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <span className="text-gray-300 group-hover:text-gray-500 transition text-xl">→</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </main>
+          </header>
+
+          <AsteriskDivider />
+
+          {groups.length === 0 ? (
+            <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
+              <Whiteboard
+                variant="small"
+                title="no groups yet"
+                subtitle="start your wing"
+                markerColor="blue"
+                className="w-full max-w-[220px]"
+              />
+              <div className="flex items-center gap-3">
+                <p className="text-nostalgia">Create or join one →</p>
+                <HandDrawnArrow direction="right" attention length={64} />
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <JoinGroupForm />
+                <CreateGroupForm />
+              </div>
+            </div>
+          ) : (
+            <section aria-labelledby="your-groups-heading">
+              <h2 id="your-groups-heading" className="text-eyebrow-display mb-3">Your groups</h2>
+              <ul className="space-y-3">
+                {groups.map(g => (
+                  <li key={g.id}>
+                    <Link
+                      href={ROUTES.group(g.id)}
+                      className="sketch-panel flex items-center gap-4 p-4 transition hover:-translate-y-0.5"
+                    >
+                      {/* Mini whiteboard carries the group's identity — green
+                          marker per doc 18 § 7 marker rotation rules. */}
+                      <div className="w-20 sm:w-24 flex-shrink-0">
+                        <Whiteboard
+                          variant="small"
+                          title={g.name}
+                          markerColor="green"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-ink-900 truncate">{g.name}</h3>
+                          {g.isAdmin && (
+                            <span className="text-[10px] bg-ink-900 text-white px-2 py-0.5 rounded-full flex-shrink-0">
+                              admin
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-ink-500 mt-1">
+                          {g.memberCount} member{g.memberCount !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <span aria-hidden="true" className="text-ink-500 transition text-xl">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </main>
+        <BottomNav currentUserId={user.id} />
+      </div>
     </div>
   )
 }

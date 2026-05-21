@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireApiUser } from '@/lib/auth/server'
+import { getUserIsAdmin, requireApiUser } from '@/lib/auth/server'
 import { SHIRT_W, SHIRT_H } from '@/lib/constants'
 import { zipSync } from 'fflate'
 
@@ -181,10 +181,9 @@ export async function GET(req: NextRequest) {
   // Admin auth check
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { supabase, user: viewer } = auth
+  const { user: viewer } = auth
 
-  const { data: me } = await supabase.from('users').select('is_admin').eq('id', viewer.id).single()
-  if (!me?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await getUserIsAdmin(viewer.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const db = await createServiceClient()
 

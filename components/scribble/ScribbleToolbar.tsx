@@ -29,7 +29,9 @@ interface ScribbleToolbarProps {
   onUndo:      () => void
   onClear:     () => void
   onPlace:     () => void
+  onEmoji?:     (emoji: string) => void
   isPlacing:   boolean
+  canPlace:    boolean
 }
 
 // ── Tool definitions ──────────────────────────────────────────
@@ -37,7 +39,7 @@ interface ScribbleToolbarProps {
 const TOOLS: { id: DrawingTool; label: string; icon: string }[] = [
   { id: TOOL_PEN,    label: 'Pen',     icon: '✏️' },
   { id: TOOL_PENCIL, label: 'Pencil',  icon: '🖊️' },
-  { id: TOOL_ERASER, label: 'Eraser',  icon: '⌫'  },
+  { id: TOOL_ERASER, label: 'Remove stroke', icon: '⌫' },
   { id: TOOL_SELECT, label: 'Select',  icon: '↖'  },
   { id: TOOL_TEXT,   label: 'Text',    icon: 'T'   },
   { id: TOOL_LINE,   label: 'Line',    icon: '╱'   },
@@ -47,14 +49,15 @@ const TOOLS: { id: DrawingTool; label: string; icon: string }[] = [
 ]
 
 const SHAPE_TOOLS = [TOOL_RECT, TOOL_CIRCLE, TOOL_ARROW] as DrawingTool[]
-const FREEHAND_TOOLS = [TOOL_PEN, TOOL_PENCIL, TOOL_ERASER] as DrawingTool[]
+const EMOJI_STAMPS = ['❤️', '😂', '🥹', '🔥', '✨', '🫶', '😭', '🫡', '⭐']
 
 // ── Component ─────────────────────────────────────────────────
 
 export default function ScribbleToolbar({
   tool, color, brushSize, opacity, fillShapes, fontSize, fontStyle,
   onTool, onColor, onBrushSize, onOpacity, onFill,
-  onFontSize, onFontStyle, onUndo, onClear, onPlace, isPlacing,
+  onFontSize, onFontStyle, onUndo, onClear, onPlace, onEmoji, isPlacing,
+  canPlace,
 }: ScribbleToolbarProps) {
   const [showPicker, setShowPicker] = useState(false)
 
@@ -90,6 +93,26 @@ export default function ScribbleToolbar({
       </div>
 
       <hr className="border-gray-100" />
+
+      {onEmoji && (
+        <div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Emoji</p>
+          <div className="grid grid-cols-5 md:grid-cols-3 gap-1">
+            {EMOJI_STAMPS.map(emoji => (
+              <button
+                key={emoji}
+                title={`Add ${emoji}`}
+                onClick={() => onEmoji(emoji)}
+                className="aspect-square rounded-lg bg-gray-100 text-base transition hover:bg-gray-200"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {onEmoji && <hr className="border-gray-100" />}
 
       {/* ── Colour ────────────────────────────────────────── */}
       {tool !== TOOL_ERASER && tool !== TOOL_SELECT && (
@@ -240,9 +263,9 @@ export default function ScribbleToolbar({
 
       <button
         onClick={onPlace}
-        disabled={isPlacing}
-        className="w-full py-2.5 rounded-xl bg-ink-900 hover:bg-ink-700 text-white font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-      >
+          disabled={isPlacing || !canPlace}
+          className="w-full py-2.5 rounded-xl bg-ink-900 hover:bg-ink-700 text-white font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+        >
         {isPlacing ? 'Placing…' : '✓ Place Scribble'}
       </button>
     </div>

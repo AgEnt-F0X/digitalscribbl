@@ -1,0 +1,16 @@
+{
+  "name": "Scribbl",
+  "short_name": "Scribbl",
+  "description": "Sign your batchmates' virtual farewell shirts.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#fffaf1",
+  "theme_color": "#6f54df",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

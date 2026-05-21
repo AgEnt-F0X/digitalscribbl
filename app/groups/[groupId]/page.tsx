@@ -1,10 +1,15 @@
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { requirePageUser } from '@/lib/auth/server'
-import AvatarDisplay from '@/components/avatar/AvatarDisplay'
+import Avatar from '@/components/avatar/Avatar'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import PlaceBackground from '@/components/place/PlaceBackground'
+import Whiteboard from '@/components/brand/Whiteboard'
+import DriftingDoodles from '@/components/brand/DriftingDoodles'
+import AsteriskDivider from '@/components/marginalia/AsteriskDivider'
 import InviteLink from './InviteLink'
 import LeaveButton from './LeaveButton'
+import RemoveMemberButton from './RemoveMemberButton'
 import { ROUTES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +30,6 @@ export default async function GroupDetailPage({ params }: Props) {
 
   if (!group) notFound()
 
-  // Verify viewer is a member
   const { data: membership } = await supabase
     .from('friend_group_members')
     .select('user_id')
@@ -33,17 +37,16 @@ export default async function GroupDetailPage({ params }: Props) {
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (!membership) notFound()  // Not a member — treat as not found
+  if (!membership) notFound()
 
   const isAdmin = group.admin_id === user.id
 
-  // Fetch all members with their profiles
   const { data: members } = await supabase
     .from('friend_group_members')
     .select(`
       user_id,
       joined_at,
-      users!inner(id, display_name, body_style, shirt_color, head_front_url, last_seen)
+      users!inner(id, display_name, body_style, shirt_color, head_front_url, avatar_config, last_seen)
     `)
     .eq('group_id', group.id)
     .order('joined_at', { ascending: true })
@@ -55,6 +58,7 @@ export default async function GroupDetailPage({ params }: Props) {
       body_style: string
       shirt_color: string
       head_front_url: string | null
+      avatar_config: unknown
       last_seen: string | null
     }),
     joined_at: m.joined_at,
@@ -65,106 +69,135 @@ export default async function GroupDetailPage({ params }: Props) {
   const now = Date.now()
   const ONLINE_MS = 15 * 60 * 1000
 
-  // Current user's profile for the nav
   const { data: myProfile } = await supabase
     .from('users')
-    .select('body_style, shirt_color, head_front_url')
+    .select('display_name, body_style, shirt_color, head_front_url, avatar_config')
     .eq('id', user.id)
     .single()
 
+  const memberCount = memberList.length
+  const memberLabel = `${memberCount} member${memberCount !== 1 ? 's' : ''}`
+
   return (
-    <div className="min-h-screen bg-cream-50">
-      <nav className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
-        <div className="flex items-center gap-3">
-          <NotificationBell userId={user.id} />
-          <Link href={ROUTES.profile(user.id)}>
-            <AvatarDisplay
-              bodyStyle={myProfile?.body_style ?? 'M1'}
-              shirtColor={myProfile?.shirt_color ?? '#F8F8F8'}
-              headFrontUrl={myProfile?.head_front_url ?? null}
-              size="sm"
-            />
-          </Link>
-        </div>
-      </nav>
+    <div className="scribbl-page relative min-h-screen">
+      {/* Lawn place layer — always ambient on group detail (doc 18 § 3). */}
+      <PlaceBackground surface="groups" illustration="lawn-golden-hour" alwaysAmbient />
+      {/* A touch of energy — low-density doodles. */}
+      <DriftingDoodles density="low" />
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-8">
-          <div>
-            <Link href="/groups" className="text-xs text-gray-400 hover:text-gray-600 transition">← Groups</Link>
-            <h1 className="text-2xl font-display font-bold text-ink-900 mt-1">{group.name}</h1>
-            <p className="text-xs text-gray-400 mt-1">
-              {memberList.length} member{memberList.length !== 1 ? 's' : ''} ·{' '}
-              Created {new Date(group.created_at).toLocaleDateString()}
-            </p>
+      <div className="relative z-10">
+        <nav className="sticky top-0 z-30 border-b border-[color:var(--line-soft)] bg-paper-100/88 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-3xl items-center justify-between">
+            <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
+            <div className="flex items-center gap-3">
+              <NotificationBell userId={user.id} />
+              <Link href={ROUTES.profile(user.id)}>
+                <Avatar
+                  row={myProfile ?? null}
+                  displayName={myProfile?.display_name}
+                  size="sm"
+                />
+              </Link>
+            </div>
           </div>
-          {!isAdmin && <LeaveButton groupId={group.id} />}
-        </div>
+        </nav>
 
-        {/* Invite link (admin + members can share) */}
-        <section className="card p-5 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="text-sm font-semibold text-ink-900">Invite link</h2>
-            <span className="text-xs text-gray-400">— share with friends to add them</span>
-          </div>
-          <InviteLink token={group.invite_token} />
-        </section>
+        <main className="mx-auto max-w-2xl px-4 py-8">
+          <header className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <Link href="/groups" className="text-eyebrow-uppercase hover:text-ink-900 transition">
+                ← Groups
+              </Link>
+              <h1 className="text-hero-display mt-2">{group.name}</h1>
+              <p className="text-nostalgia mt-2">
+                {memberLabel} · Created {new Date(group.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="w-full max-w-[260px] sm:self-end">
+              {/* Wall-mounted whiteboard carries the group identity. */}
+              <Whiteboard
+                variant="wall-mounted"
+                title={group.name}
+                subtitle={memberLabel}
+                markerColor="green"
+              />
+            </div>
+          </header>
 
-        {/* Member grid */}
-        <section>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
-            Members ({memberList.length})
-          </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-            {memberList.map(m => {
-              const isOnline = m.last_seen && now - new Date(m.last_seen).getTime() < ONLINE_MS
-              return (
-                <Link
-                  key={m.id}
-                  href={ROUTES.profile(m.id)}
-                  className="group flex flex-col items-center gap-2 p-3 rounded-2xl hover:bg-white hover:shadow-sm transition"
-                >
-                  <div className="relative">
-                    <AvatarDisplay
-                      bodyStyle={m.body_style}
-                      shirtColor={m.shirt_color}
-                      headFrontUrl={m.head_front_url}
-                      size="sm"
-                      className="group-hover:scale-105 transition-transform"
-                    />
-                    {isOnline && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
-                    )}
-                    {m.isAdmin && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-ink-900 text-white rounded-full flex items-center justify-center text-[8px] font-bold">
-                        A
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-ink-900 truncate w-full">
-                      {m.display_name.split(' ')[0]}
-                      {m.isMe && <span className="text-gray-400 font-normal"> (you)</span>}
-                    </p>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        </section>
+          {!isAdmin && (
+            <div className="mb-6 flex justify-end">
+              <LeaveButton groupId={group.id} />
+            </div>
+          )}
 
-        {/* Admin controls */}
-        {isAdmin && (
-          <section className="mt-8 p-4 border border-gray-200 rounded-xl bg-white">
-            <h2 className="text-sm font-semibold text-ink-900 mb-3">Admin controls</h2>
-            <p className="text-xs text-gray-400">
-              As group admin, you can share the invite link above. To remove a member, contact support or use Supabase directly (member management UI coming soon).
-            </p>
+          <section aria-labelledby="invite-heading" className="sketch-panel p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 id="invite-heading" className="text-eyebrow-display">Invite link</h2>
+              <span className="text-xs text-ink-500">— share with friends to add them</span>
+            </div>
+            <InviteLink token={group.invite_token} />
           </section>
-        )}
-      </main>
+
+          <AsteriskDivider />
+
+          <section aria-labelledby="members-heading">
+            <h2 id="members-heading" className="text-eyebrow-display mb-4">
+              Members ({memberCount})
+            </h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+              {memberList.map(m => {
+                const isOnline = m.last_seen && now - new Date(m.last_seen).getTime() < ONLINE_MS
+                return (
+                  <div
+                    key={m.id}
+                    className="group flex flex-col items-center gap-2 rounded-2xl p-3 transition hover:bg-white/55 hover:shadow-sm"
+                  >
+                    <Link href={ROUTES.profile(m.id)} className="flex flex-col items-center gap-2">
+                      <div className="relative">
+                        <Avatar
+                          row={m}
+                          displayName={m.display_name}
+                          size="sm"
+                          className="transition-transform group-hover:scale-105"
+                        />
+                        {isOnline && (
+                          <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-green-400" aria-label="Online now" />
+                        )}
+                        {m.isAdmin && (
+                          <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink-900 text-[8px] font-bold text-white" aria-label="Group admin">
+                            A
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p className="w-full truncate text-xs font-semibold text-ink-900">
+                          {m.display_name.split(' ')[0]}
+                          {m.isMe && <span className="font-normal text-ink-500"> (you)</span>}
+                        </p>
+                      </div>
+                    </Link>
+                    {isAdmin && !m.isAdmin && (
+                      <RemoveMemberButton groupId={group.id} userId={m.id} name={m.display_name} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          {isAdmin && (
+            <>
+              <AsteriskDivider />
+              <section aria-labelledby="admin-heading" className="sketch-panel p-4">
+                <h2 id="admin-heading" className="text-eyebrow-display mb-2">Admin controls</h2>
+                <p className="text-sm text-ink-500">
+                  Share the invite link above to add members. Hover a member card to remove someone from this friend group.
+                </p>
+              </section>
+            </>
+          )}
+        </main>
+      </div>
     </div>
   )
 }

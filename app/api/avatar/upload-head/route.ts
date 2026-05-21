@@ -2,13 +2,37 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireApiUser } from '@/lib/auth/server'
 import { HEAD_MAX_BYTES, HEAD_MAX_DIMENSION, BUCKET_HEADS } from '@/lib/constants'
+import { createFixedWindowRateLimiter, rateLimitResponseHeaders } from '@/lib/utils/rateLimit'
+import { getPlatformFlags } from '@/lib/utils/platformFlags'
 
 export const runtime = 'nodejs'
+
+// Heads are ~80 KB after Sharp re-encode but the upload is up to 5 MB.
+// Cap to 3/min so a stuck slider can't burn the storage budget. Onboarding
+// is a one-time flow; everyday users will never trip this.
+const headUploadLimiter = createFixedWindowRateLimiter({ limit: 3, windowMs: 60_000 })
 
 export async function POST(req: NextRequest) {
   const auth = await requireApiUser()
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { user } = auth
+
+  const rate = headUploadLimiter.check(user.id)
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Too many uploads. Wait a minute and try again.', code: 'RATE_LIMITED' },
+      { status: 429, headers: rateLimitResponseHeaders(rate) },
+    )
+  }
+
+  const db = await createServiceClient()
+  const flags = await getPlatformFlags(db)
+  if (flags.disable_head_uploads) {
+    return NextResponse.json(
+      { error: 'Face uploads are paused. Pick a placeholder for now — you can change it later.', code: 'HEAD_UPLOADS_DISABLED' },
+      { status: 503 },
+    )
+  }
 
   const formData = await req.formData().catch(() => null)
   if (!formData) return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
@@ -26,8 +50,8 @@ export async function POST(req: NextRequest) {
   const { fileTypeFromBuffer } = await import('file-type')
   const type    = await fileTypeFromBuffer(buffer)
 
-  if (!type || !['image/png', 'image/jpeg'].includes(type.mime)) {
-    return NextResponse.json({ error: 'Only PNG and JPEG images are accepted' }, { status: 400 })
+  if (!type || !['image/png', 'image/jpeg', 'image/webp'].includes(type.mime)) {
+    return NextResponse.json({ error: 'Only PNG, JPEG, and WebP images are accepted' }, { status: 400 })
   }
   if (buffer.length > HEAD_MAX_BYTES) {
     return NextResponse.json({ error: 'File too large — max 5 MB' }, { status: 413 })
@@ -40,7 +64,6 @@ export async function POST(req: NextRequest) {
     .webp({ quality: 82 })
     .toBuffer()
 
-  const db        = await createServiceClient()
   const path      = `heads/${user.id}/${side}.webp`
   const { error } = await db.storage
     .from(BUCKET_HEADS)

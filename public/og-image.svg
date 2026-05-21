@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#fffaf1"/>
+  <path d="M0 0h1200v630H0z" fill="none" stroke="#2d2923" stroke-opacity=".16" stroke-width="8"/>
+  <circle cx="855" cy="286" r="172" fill="#d9d2ff" opacity=".45"/>
+  <path d="M704 226c37-42 265-42 302 0l-46 310H750z" fill="#fffdf7" stroke="#2d2923" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M770 226l51 55 34-55M940 226l-51 55-34-55" fill="none" stroke="#2d2923" stroke-width="4" stroke-linecap="round"/>
+  <path d="M855 284v244" stroke="#2d2923" stroke-width="4" stroke-opacity=".45"/>
+  <path d="M781 355c30 20 61 15 91-12M812 438c41-28 82-20 123 23" fill="none" stroke="#6f54df" stroke-width="8" stroke-linecap="round"/>
+  <text x="96" y="210" font-family="Comic Sans MS, Caveat, cursive" font-size="104" font-weight="700" fill="#2d2923">Scribbl</text>
+  <path d="M110 235c137 26 296 22 424-6" fill="none" stroke="#6f54df" stroke-width="10" stroke-linecap="round"/>
+  <text x="100" y="320" font-family="Inter, Arial, sans-serif" font-size="42" fill="#2d2923">Sign your shirt. Sign theirs.</text>
+  <text x="100" y="382" font-family="Inter, Arial, sans-serif" font-size="28" fill="#766f63">A warm digital farewell for your batch.</text>
+</svg>

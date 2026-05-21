@@ -6,6 +6,7 @@ export const runtime = 'nodejs'
 const ALLOWED_FIELDS = [
   'display_name',
   'yearbook_quote',
+  'thank_you_message',
   'shirt_permission',
   'body_style',
   'shirt_color',
@@ -44,6 +45,11 @@ export async function PATCH(req: NextRequest) {
     } else if (field === 'yearbook_quote') {
       if (val !== null && (typeof val !== 'string' || val.length > 300)) {
         return NextResponse.json({ error: 'Quote must be under 300 characters' }, { status: 422 })
+      }
+      updates[field] = val === '' ? null : val
+    } else if (field === 'thank_you_message') {
+      if (val !== null && (typeof val !== 'string' || val.length > 180)) {
+        return NextResponse.json({ error: 'Thank-you message must be under 180 characters' }, { status: 422 })
       }
       updates[field] = val === '' ? null : val
     } else if (field === 'shirt_permission') {

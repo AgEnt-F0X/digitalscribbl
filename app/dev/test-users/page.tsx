@@ -4,7 +4,7 @@ import { getAvailableDevAuthSlots, isDevAuthBypassEnabled } from '@/lib/auth/dev
 export default function DevTestUsersPage() {
   if (!isDevAuthBypassEnabled()) {
     return (
-      <main className="min-h-screen bg-cream-50 px-4 py-12">
+      <main className="min-h-screen bg-paper-100 px-4 py-12">
         <div className="max-w-xl mx-auto card p-6">
           <h1 className="text-xl font-display font-bold text-ink-900">Dev test users disabled</h1>
           <p className="text-sm text-gray-500 mt-2">
@@ -18,7 +18,7 @@ export default function DevTestUsersPage() {
   const slots = getAvailableDevAuthSlots()
 
   return (
-    <main className="min-h-screen bg-cream-50 px-4 py-12">
+    <main className="min-h-screen bg-paper-100 px-4 py-12">
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-display font-bold text-ink-900">Dev test users</h1>

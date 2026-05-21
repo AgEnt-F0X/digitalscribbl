@@ -2,68 +2,645 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * `@property` registrations for animatable custom properties.
+ * Must live at top level (not inside :root) so the browser can register the
+ * syntax + initial value before any animation kicks in. Pencil-shade is what
+ * powers the school-physics button hover specced in doc 18 § 14.
+ */
+@property --pencil-shade-strength {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 4%;
+}
+
 @layer base {
   :root {
-    --font-display: 'Georgia', serif;
-    --font-body:    system-ui, sans-serif;
-    --font-mono:    ui-monospace, monospace;
+    /* Fonts — set by next/font/google in layout.tsx */
+    --font-display: 'Caveat', 'Patrick Hand', 'Segoe Print', cursive;
+    --font-hand:    'Patrick Hand', 'Caveat', cursive;
+    --font-marker:  'Permanent Marker', 'Caveat', cursive;
+    --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+    /*
+     * Paper surfaces — warmed in round 3 of doc 18 (Sunlit Lawn theme).
+     * paper-100 went from #FFF9E6 → #FFF6D9 (~8% warmer toward golden hour).
+     * The Place layer illustrations rely on `mix-blend-mode: multiply` against
+     * this substrate to produce the golden-hour atmospheric effect.
+     */
+    --paper-50:   #FFFDF7;
+    --paper-100:  #FFF6D9;
+    --paper-200:  #FFF0C2;
+    --paper-300:  #F4EAD8;
+
+    /* Ink */
+    --ink-900:    #1A1208;
+    --ink-700:    #3D2E14;
+    --ink-500:    #6B4E1E;
+
+    /* Brand */
+    --brand:        #6f54df;
+    --brand-soft:   #ECE8FB;
+    --brand-hover:  #5B41C9;
+    --brand-ring:   rgba(111, 84, 223, 0.30);
+
+    /*
+     * Whiteboard — round 4 rename from chalkboard (doc 18 § 7).
+     * Off-white surface + aluminum frame + dry-erase marker text.
+     */
+    --whiteboard-surface:    #F8F8F2;
+    --whiteboard-frame:      #cfd5da;
+    --whiteboard-frame-edge: #9ba2aa;
+    --whiteboard-erased:     rgba(155, 162, 170, 0.04);
+
+    /* Marker palette — dry-erase colours, used on whiteboard text only */
+    --marker-blue:   #2563EB;
+    --marker-black:  #1A1208;
+    --marker-red:    #D83F6B;
+    --marker-green:  #5F8B48;
+
+    /*
+     * Micro-interaction tokens — doc 18 § 14.
+     * Pencil-shade powers button hover (school-physics replacement for the
+     * SaaS `translateY(-1px)`). Ink-bleed powers input focus underlines, ink
+     * checkmarks, signature mode, and the warm-brown handwriting feel.
+     */
+    --pencil-shade-color: rgba(45, 41, 35, 1);
+    --ink-bleed:          rgba(61, 46, 20, 0.85);
+    --ink-stamp-green:    #5F8B48;
+
+    /* Edges */
+    --line-soft:    rgba(45, 41, 35, 0.14);
+    --line-softer:  rgba(45, 41, 35, 0.08);
+    --line-strong:  rgba(45, 41, 35, 0.28);
   }
 
   * {
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Prevent iOS auto-zoom on input focus */
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-cream-50 text-ink-900 font-body antialiased;
+    @apply bg-paper-100 text-ink-900 font-body antialiased;
+    /* Mobile safe-area defaults */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Fabric.js canvas cursor fix */
+  /* Disable iOS bounce overscroll behavior */
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  /* Inputs at 16px+ to prevent iOS zoom-on-focus */
+  input, textarea, select {
+    @apply text-base;
+  }
+
+  /* Fabric.js canvas cursor cleanup */
   canvas {
     outline: none;
+    touch-action: none;
+  }
+
+  /* Smoother typography on dark text */
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-ink-900;
+    text-rendering: optimizeLegibility;
   }
 }
 
 @layer components {
+  /* ── Page surface ──────────────────────────────────────────── */
+  .scribbl-page {
+    background:
+      radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0) 28%),
+      radial-gradient(circle at 86% 90%, rgba(111, 84, 223, 0.04), transparent 30%),
+      linear-gradient(90deg, rgba(45, 41, 35, 0.025) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(45, 41, 35, 0.020) 1px, transparent 1px),
+      var(--paper-100);
+    background-size: auto, auto, 34px 34px, 34px 34px, auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Soft purple vignette behind avatar — the hero glow from the mocks */
+  .avatar-glow {
+    background:
+      radial-gradient(ellipse at center, rgba(111, 84, 223, 0.12), transparent 60%);
+  }
+
+  /* ── Panels and cards ──────────────────────────────────────── */
+  .sketch-panel {
+    @apply border bg-white/85 backdrop-blur-sm;
+    border-color: var(--line-soft);
+    border-radius: 18px 16px 20px 15px;
+    box-shadow:
+      0 18px 48px rgba(45, 35, 22, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+  }
+
+  .sketch-panel-flat {
+    @apply border bg-white/70;
+    border-color: var(--line-soft);
+    border-radius: 14px 16px 13px 15px;
+    box-shadow: 0 6px 16px rgba(45, 35, 22, 0.05);
+  }
+
+  /*
+   * `.card` is the alias the onboarding flow and a handful of other surfaces
+   * use. Keeps the call site readable (`<div className="card p-6">`) while
+   * we standardise on `sketch-panel` as the underlying primitive.
+   * Don't add styling here — extend `sketch-panel` instead.
+   */
+  .card {
+    @apply sketch-panel;
+  }
+
+  .paper-note {
+    @apply bg-paper-200 shadow-paper;
+    border: 1px solid rgba(45, 41, 35, 0.16);
+    border-radius: 10px 12px 9px 11px;
+    position: relative;
+  }
+
+  .paper-note-tape {
+    @apply paper-note;
+  }
+
+  .paper-note-tape::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    width: 56px;
+    height: 18px;
+    background: rgba(255, 230, 130, 0.75);
+    border: 1px solid rgba(45, 41, 35, 0.10);
+    transform: rotate(-3deg);
+    box-shadow: 0 1px 2px rgba(45, 35, 22, 0.08);
+    border-radius: 2px;
+  }
+
+  /*
+   * ── Buttons ─────────────────────────────────────────────────
+   *
+   * School-physics hover state (doc 18 § 14): the pencil texture animates
+   * from 4% → 18% → 28% opacity to feel like a pencil shading-in the button.
+   * Replaces the SaaS `translateY(-1px)` we used to ship. `@property` makes
+   * the gradient opacity smoothly interpolate. Browsers without @property
+   * support degrade to instant transition + the same visual end-state.
+   */
+  .pencil-button {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold;
+    @apply min-h-[44px];
+    --pencil-shade-strength: 4%;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px 16px 13px 15px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.28), rgba(255,255,255,0)),
+      repeating-linear-gradient(
+        -12deg,
+        rgba(45, 41, 35, calc(var(--pencil-shade-strength) / 100)) 0 2px,
+        transparent 2px 8px
+      ),
+      #dceced;
+    color: var(--ink-900);
+    transition:
+      --pencil-shade-strength 200ms ease-out,
+      border-color 200ms ease-out,
+      transform 100ms ease-out;
+  }
+  .pencil-button:hover {
+    --pencil-shade-strength: 18%;
+    border-color: rgba(45, 41, 35, 0.42);
+  }
+  .pencil-button:active {
+    --pencil-shade-strength: 28%;
+    transform: translateY(1px);
+  }
+
+  .pencil-button-primary {
+    @apply pencil-button text-white;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0)),
+      repeating-linear-gradient(
+        -12deg,
+        rgba(255, 255, 255, calc(var(--pencil-shade-strength) / 100 * 1.5)) 0 2px,
+        transparent 2px 8px
+      ),
+      var(--brand);
+    border-color: var(--brand-hover);
+  }
+  .pencil-button-primary:hover {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0)),
+      repeating-linear-gradient(
+        -12deg,
+        rgba(255, 255, 255, calc(var(--pencil-shade-strength) / 100 * 1.5)) 0 2px,
+        transparent 2px 8px
+      ),
+      var(--brand-hover);
+  }
+
   .btn-primary {
-    @apply px-4 py-2 bg-ink-900 hover:bg-ink-700 text-white rounded-xl font-medium text-sm transition shadow-sm;
+    @apply inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 bg-ink-900 text-white text-sm font-medium rounded-2xl shadow-paper-soft transition hover:bg-ink-700 active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-white hover:bg-gray-50 text-ink-900 rounded-xl font-medium text-sm transition border border-gray-200;
+    @apply inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 bg-white text-ink-900 text-sm font-medium rounded-2xl border border-ink-100 transition hover:bg-paper-50 active:scale-[0.98];
   }
 
-  .card {
-    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 min-h-[44px] px-3 py-2 text-ink-700 text-sm font-medium rounded-xl transition hover:bg-paper-50 active:scale-[0.98];
   }
 
+  /*
+   * Keyboard-focus rings for every button family.
+   *
+   * The browser default focus outline disappears on the cream paper
+   * surface — keyboard users had no idea where they were. We pin a single
+   * brand-coloured ring to the four button utilities. `:focus-visible`
+   * (not `:focus`) so it never fires on mouse / touch clicks.
+   */
+  .pencil-button:focus-visible,
+  .pencil-button-primary:focus-visible,
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible,
+  .btn-ghost:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--brand-ring);
+  }
+
+  /*
+   * ── Stickers (floating speech bubbles outside shirt) ───────
+   * Lift-off-paper hover (doc 18 § 14): shadow grows + slight scale, rotation
+   * preserved via inline transform composition.
+   */
+  .sticker-note {
+    @apply absolute rounded-2xl border px-4 py-3 font-display text-base leading-6 shadow-sticker;
+    border-color: rgba(45, 41, 35, 0.14);
+    filter: drop-shadow(0 8px 12px rgba(45, 35, 22, 0.10));
+    background: #fff;
+    transition: filter 180ms ease-out, transform 180ms ease-out;
+  }
+  .sticker-note:hover {
+    filter: drop-shadow(0 14px 22px rgba(80, 90, 105, 0.18));
+  }
+
+  .sticker-reaction {
+    @apply absolute h-12 w-12 grid place-items-center rounded-full border bg-white text-2xl shadow-sticker;
+    border-color: rgba(45, 41, 35, 0.12);
+    filter: drop-shadow(0 8px 12px rgba(45, 35, 22, 0.12));
+    transition: filter 180ms ease-out;
+  }
+  .sticker-reaction:hover {
+    filter: drop-shadow(0 14px 22px rgba(80, 90, 105, 0.18));
+  }
+
+  /*
+   * ── Marker colour utilities ────────────────────────────────
+   * Used on whiteboard text only (doc 18 § 7). Each colour ships with its own
+   * 0.5px-blur text-shadow so the marker visually "bleeds" into the surface.
+   */
+  .marker-blue   { color: var(--marker-blue);  text-shadow: 0 0 0.5px var(--marker-blue); }
+  .marker-black  { color: var(--marker-black); text-shadow: 0 0 0.5px var(--marker-black); }
+  .marker-red    { color: var(--marker-red);   text-shadow: 0 0 0.5px var(--marker-red); }
+  .marker-green  { color: var(--marker-green); text-shadow: 0 0 0.5px var(--marker-green); }
+
+  /* ── Hand-drawn accents ────────────────────────────────────── */
+  .scribble-underline {
+    background-image: linear-gradient(90deg, transparent, var(--brand) 12%, var(--brand) 82%, transparent);
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-size: 100% 3px;
+    padding-bottom: 4px;
+  }
+
+  .rough-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(45,41,35,0.18), rgba(45,41,35,0.06), transparent);
+  }
+
+  /* ── Forms ──────────────────────────────────────────────────── */
   .input {
-    @apply w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-ink-900
-           focus:outline-none focus:ring-2 focus:ring-ink-900/20 focus:border-ink-900
-           text-sm transition;
+    @apply w-full min-h-[44px] px-3 py-2.5 rounded-xl border bg-white text-ink-900 text-base transition;
+    border-color: var(--line-soft);
+  }
+  .input:focus {
+    @apply outline-none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
   }
 
   .label {
-    @apply block text-xs font-medium text-gray-500 mb-1;
+    @apply block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide;
+  }
+
+  /* ── Panel-tabs (shirt front/back, etc) ──────────────────── */
+  .panel-tab {
+    @apply px-3.5 py-2 rounded-xl text-sm font-semibold transition min-h-[40px] inline-flex items-center;
+  }
+  .panel-tab[data-active='true'] {
+    @apply bg-brand text-white;
+  }
+  .panel-tab[data-active='false'] {
+    @apply text-ink-500 hover:bg-paper-50;
+  }
+
+  /* ── Skeleton loaders ──────────────────────────────────────── */
+  .paper-skeleton {
+    @apply animate-paper-shimmer rounded-xl bg-paper-300;
+  }
+
+  /* ── Bottom nav (mobile) ──────────────────────────────────── */
+  .bottom-nav {
+    @apply fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t;
+    border-color: var(--line-soft);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -4px 12px rgba(45, 35, 22, 0.04);
+  }
+
+  /*
+   * Inactive label hits ~4.0:1 on `--ink-300` against paper-100 — under
+   * the WCAG AA 4.5:1 floor for small text. `ink-500` measures ~6.6:1.
+   */
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[11px] font-medium text-ink-500 transition min-h-[56px];
+  }
+  .bottom-nav-item[data-active='true'] {
+    @apply text-brand;
+  }
+
+  /* ── Floating CTA (the + Sign button in center of bottom nav) ─── */
+  .nav-fab {
+    @apply h-14 w-14 -mt-6 rounded-full bg-brand text-white grid place-items-center shadow-paper-deep transition;
+  }
+  .nav-fab:active {
+    @apply scale-95;
   }
 }
 
-/* Ghost box smooth movement */
-.ghost-box-transition {
-  transition: left 60ms ease-out, top 60ms ease-out;
+@layer utilities {
+  /* Truncate to N lines */
+  .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* Mobile-friendly tap target enforcement */
+  .tap-44 { min-height: 44px; min-width: 44px; }
+
+  /* No tap highlight */
+  .no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+
+  /* Scrollbar — hidden on mobile, slim on desktop */
+  .scrollbar-slim::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-slim::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-slim::-webkit-scrollbar-thumb { background: rgba(45, 41, 35, 0.20); border-radius: 999px; }
+
+  /*
+   * ── Typography ladder (doc 18 § 9) ──────────────────────────
+   * Use these utility classes instead of one-off Tailwind sizes for the
+   * design-system text moments. Each class encodes family + size + weight +
+   * leading + colour for a specific *role*, so usage stays self-documenting.
+   * Mobile and desktop sizes differ — handled by clamp() or responsive variants.
+   */
+  .text-hero-name {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 6vw, 72px);
+    font-weight: 600;
+    line-height: 1.0;
+    color: var(--ink-900);
+    letter-spacing: -0.01em;
+  }
+
+  .text-hero-display {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4.5vw, 48px);
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--ink-900);
+  }
+
+  .text-eyebrow-display {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 2.5vw, 24px);
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--ink-700);
+  }
+
+  .text-marker {
+    font-family: var(--font-marker);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+  }
+
+  /*
+   * `.text-handwritten-note` — the ink-on-paper effect (doc 18 § 9).
+   * Pen-written feel: Patrick Hand + warm-brown ink + subtle ink bleed.
+   * Auto-applies inside `.sticker-note`, `.paper-note`, `.paper-note-tape`
+   * (see selectors below).
+   */
+  .text-handwritten-note {
+    font-family: var(--font-hand);
+    font-size: 17px;
+    line-height: 1.55;
+    font-weight: 400;
+    color: var(--ink-bleed);
+    letter-spacing: 0.01em;
+    text-shadow:
+      0 0 0.6px currentColor,
+      0 0.4px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  .text-nostalgia {
+    font-family: var(--font-hand);
+    font-size: clamp(16px, 1.6vw, 18px);
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--ink-700);
+  }
+
+  .text-eyebrow-uppercase {
+    font-family: var(--font-body);
+    font-size: clamp(11px, 1.1vw, 12px);
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-500);
+  }
+
+  /*
+   * ── Tilt utilities ─────────────────────────────────────────
+   * Strategic ±2° rotation primitives for sticker notes, paper notes, and
+   * washi tape (doc 18 § 6). Never apply to body text, buttons, or panels.
+   */
+  .tilt-left  { transform: rotate(-2deg); }
+  .tilt-right { transform: rotate(2deg); }
+  .tilt-tiny  { transform: rotate(1deg); }
+  .tilt-tiny-left { transform: rotate(-1deg); }
+
+  /*
+   * ── Place layer utilities ──────────────────────────────────
+   * Used by `<PlaceBackground>` (doc 18 § 4) to layer illustrated campus
+   * backgrounds underneath the substrate via `mix-blend-mode: multiply`.
+   * Two states: vivid (first visit, login) and ambient (settled background).
+   */
+  .place-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  .place-layer--vivid {
+    opacity: 0.80;
+    filter: none;
+    mix-blend-mode: multiply;
+  }
+  .place-layer--ambient {
+    opacity: 0.10;
+    filter: blur(3px);
+    mix-blend-mode: multiply;
+  }
+  .place-layer--fading {
+    animation: place-fade-to-ambient 1800ms ease-out forwards;
+    mix-blend-mode: multiply;
+    will-change: opacity, filter;
+  }
+  @keyframes place-fade-to-ambient {
+    0%   { opacity: 0.80; filter: none; }
+    100% { opacity: 0.10; filter: blur(3px); }
+  }
+  @media (max-width: 768px) {
+    .place-layer--fading {
+      animation-duration: 1100ms;
+    }
+  }
+
+  /*
+   * ── Avatar halo ────────────────────────────────────────────
+   * The soft brand-soft radial gradient behind the user's avatar (doc 18 § 8,
+   * round-5 primitive). Confirmed by the original concept image. Sits between
+   * place layer and avatar; no card chrome.
+   */
+  .avatar-halo {
+    position: absolute;
+    background: radial-gradient(ellipse at center, var(--brand-soft) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
 }
 
-/* Shirt panel tab */
-.panel-tab {
-  @apply px-3 py-1.5 rounded-lg text-sm font-medium transition;
-}
-.panel-tab[data-active='true'] {
-  @apply bg-ink-900 text-white;
-}
-.panel-tab[data-active='false'] {
-  @apply text-gray-500 hover:bg-gray-100;
+/*
+ * ── Handwritten ink-on-paper auto-application ────────────────────────────
+ * Any text inside a sticker-note, paper-note, or paper-note-tape inherits
+ * the handwritten-note treatment by default. Override per-element if a
+ * specific note needs Inter or Caveat (e.g. signatures).
+ */
+.sticker-note,
+.paper-note,
+.paper-note-tape {
+  font-family: var(--font-hand);
+  color: var(--ink-bleed);
+  text-shadow:
+    0 0 0.6px currentColor,
+    0 0.4px 0 rgba(0, 0, 0, 0.04);
+  letter-spacing: 0.01em;
 }
 
-/* Scrollbar */
+/* Global scrollbar default — slim, paper-coloured */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: rgba(45, 41, 35, 0.20); border-radius: 999px; }
+
+/*
+ * Reduced motion — respect the OS preference. The paper-shimmer skeletons,
+ * confetti, badge-bounce, and the page-fade transitions all carry meaning
+ * on hover/focus, so we don't strip them entirely; we just collapse to a
+ * near-instant duration and stop the infinite shimmer. This is the
+ * minimum WCAG SC 2.3.3 / 2.2.2 hand-shake.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .paper-skeleton,
+  .animate-paper-shimmer,
+  .animate-confetti-in,
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-badge-bounce,
+  .animate-scribble-draw {
+    animation: none !important;
+  }
+
+  /*
+   * Sunlit Lawn motion neutralisation (doc 18 § 14).
+   * SVG stroke-dasharray reveals jump straight to the drawn state. Place
+   * layer skips the fade keyframe and renders at ambient immediately.
+   * Pencil-shade variable still ramps via transition: 0.001ms (instant).
+   */
+  .place-layer--fading {
+    animation: none !important;
+    opacity: 0.10 !important;
+    filter: blur(3px) !important;
+  }
+  .ink-underline path,
+  .ink-check path,
+  .hand-drawn-arrow path {
+    stroke-dashoffset: 0 !important;
+  }
+  .stamp-success {
+    transform: scale(1) rotate(5deg) !important;
+    opacity: 0.85 !important;
+  }
+  .hand-drawn-arrow--attention {
+    animation: none !important;
+  }
+}
+
+/*
+ * ── Round 5 — added by Subagent A ─────────────────────────────────────────
+ * Keyframes referenced by the micro-interaction components shipped in
+ * Phase 1B. The reduced-motion block above already neutralises all three;
+ * these are the un-reduced animation definitions.
+ */
+@keyframes stamp-land {
+  0%   { opacity: 0;    transform: scale(1.3) rotate(8deg); }
+  60%  { opacity: 0.85; transform: scale(0.97) rotate(2deg); }
+  100% { opacity: 0.85; transform: scale(1)    rotate(5deg); }
+}
+
+.stamp-success {
+  animation: stamp-land 260ms ease-out forwards;
+  transform-origin: 50% 50%;
+}
+
+@keyframes attention-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(2deg); }
+  75%      { transform: rotate(-2deg); }
+}
+
+.hand-drawn-arrow--attention {
+  animation: attention-wiggle 600ms ease-in-out 3;
+  transform-origin: 50% 50%;
+}
+

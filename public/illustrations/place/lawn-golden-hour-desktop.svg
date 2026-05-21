@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched campus lawn at golden hour (desktop placeholder)">
+  <defs>
+    <linearGradient id="sky-d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe6b3"/>
+      <stop offset="55%" stop-color="#fbd498"/>
+      <stop offset="100%" stop-color="#f4ba79"/>
+    </linearGradient>
+    <radialGradient id="sun-d" cx="0.78" cy="0.22" r="0.32">
+      <stop offset="0%" stop-color="#fff3d1" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#ffdca0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#fbd498" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lawn-d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b9c277"/>
+      <stop offset="100%" stop-color="#86934f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sky-d)"/>
+  <rect width="1920" height="1080" fill="url(#sun-d)"/>
+  <path d="M0 720 C 480 660 980 700 1450 660 C 1640 645 1820 660 1920 670 L 1920 1080 L 0 1080 Z" fill="url(#lawn-d)"/>
+  <path d="M0 720 C 480 660 980 700 1450 660 C 1640 645 1820 660 1920 670" fill="none" stroke="#5e6a36" stroke-width="2.5" opacity="0.55" stroke-linecap="round"/>
+  <g opacity="0.45" stroke="#5e6a36" stroke-width="2" stroke-linecap="round">
+    <path d="M120 820 l4 -16"/>
+    <path d="M180 880 l4 -16"/>
+    <path d="M240 800 l4 -16"/>
+    <path d="M300 860 l4 -16"/>
+    <path d="M400 900 l4 -16"/>
+    <path d="M520 820 l4 -16"/>
+    <path d="M640 880 l4 -16"/>
+    <path d="M760 800 l4 -16"/>
+    <path d="M880 860 l4 -16"/>
+    <path d="M1000 920 l4 -16"/>
+    <path d="M1120 820 l4 -16"/>
+    <path d="M1260 880 l4 -16"/>
+    <path d="M1400 800 l4 -16"/>
+    <path d="M1540 860 l4 -16"/>
+    <path d="M1680 820 l4 -16"/>
+    <path d="M1820 880 l4 -16"/>
+  </g>
+  <g opacity="0.55">
+    <ellipse cx="1380" cy="600" rx="160" ry="120" fill="#8aa15c"/>
+    <ellipse cx="1320" cy="560" rx="120" ry="90" fill="#9bb16c"/>
+    <ellipse cx="1450" cy="570" rx="110" ry="80" fill="#7e9355"/>
+    <path d="M1380 720 v-90" stroke="#5b4524" stroke-width="14" stroke-linecap="round"/>
+    <path d="M1370 660 c -8 14 -10 36 0 56" stroke="#5b4524" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.35">
+    <ellipse cx="320" cy="640" rx="110" ry="80" fill="#a3b56a"/>
+    <ellipse cx="360" cy="610" rx="80" ry="60" fill="#b6c277"/>
+    <path d="M340 720 v-70" stroke="#5b4524" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.25" stroke="#7a6238" stroke-width="3" fill="none">
+    <path d="M820 650 c 30 -20 80 -22 130 0 c 50 22 110 18 150 -2" stroke-linecap="round"/>
+    <path d="M860 670 c 40 -8 90 -8 140 4" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.18" stroke="#3D2E14" stroke-width="1.5" fill="none">
+    <path d="M520 720 L 540 760 L 560 720" stroke-linecap="round"/>
+    <path d="M620 740 L 640 780 L 660 740" stroke-linecap="round"/>
+    <path d="M1080 730 L 1100 770 L 1120 730" stroke-linecap="round"/>
+  </g>
+</svg>

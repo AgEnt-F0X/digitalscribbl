@@ -1,11 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { createActionCooldown } from '@/lib/utils/actionCooldown'
+import { showToast } from '@/lib/hooks/useToast'
+
+const requestCooldown = createActionCooldown({ cooldownMs: 1200 })
 
 export default function RequestScribbleButton({ ownerId }: { ownerId: string }) {
   const [status, setStatus] = useState<'idle' | 'sent' | 'loading'>('idle')
 
   const send = async () => {
+    if (!requestCooldown.canRun(`request:${ownerId}`)) return
     setStatus('loading')
     const res = await fetch('/api/scribble/request', {
       method: 'POST',
@@ -13,6 +18,11 @@ export default function RequestScribbleButton({ ownerId }: { ownerId: string }) 
       body: JSON.stringify({ owner_id: ownerId }),
     })
     setStatus(res.ok ? 'sent' : 'idle')
+    showToast({
+      tone: res.ok ? 'success' : 'error',
+      title: res.ok ? 'Request sent' : 'Could not send request',
+      body: res.ok ? 'They can approve it from notifications.' : 'Try again in a moment.',
+    })
   }
 
   if (status === 'sent') {
