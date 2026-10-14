@@ -6,6 +6,11 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type BodyStyle = 'M1' | 'M2' | 'M3' | 'F1' | 'F2' | 'F3'
+/**
+ * v1 permission matrix — retired by migration 005. Kept as an alias so old
+ * call sites fail loudly at the type boundary rather than silently compiling.
+ * Do not use in new code; read shirts.visibility instead.
+ */
 export type ShirtPermission = 'open' | 'batch_only' | 'request_only' | 'locked'
 export type Panel = 'front' | 'back' | 'sleeves'
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
@@ -59,7 +64,10 @@ export type Database = {
           avatar_config:        Json
           yearbook_quote:       string | null
           thank_you_message:    string | null
-          shirt_permission:     string
+          // unverified | pending | verified | rejected. A roster match proves a
+          // student EXISTS; proving they own the mailbox is separate, so a
+          // matched-but-unproven student is not treated as verified.
+          verification_status: string
           is_admin:             boolean
           is_suspended:         boolean
           is_university_verified: boolean
@@ -95,7 +103,7 @@ export type Database = {
           avatar_config?:        Json
           yearbook_quote?:       string | null
           thank_you_message?:    string | null
-          shirt_permission?:     string
+          verification_status?: string
           is_admin?:             boolean
           is_suspended?:         boolean
           is_university_verified?: boolean
@@ -122,7 +130,7 @@ export type Database = {
           avatar_config?:        Json
           yearbook_quote?:       string | null
           thank_you_message?:    string | null
-          shirt_permission?:     string
+          verification_status?: string
           is_admin?:             boolean
           is_suspended?:         boolean
           is_university_verified?: boolean
@@ -156,6 +164,11 @@ export type Database = {
           back_occupancy:      number
           sleeves_occupancy:   number
           is_locked:           boolean
+          // One-door access model (doc 07): open = anyone with the link signs
+          // immediately; circle = only the owner's shirt_circle; approval =
+          // anyone draws but the owner approves the reveal. Default 'open'
+          // because real scribble day is open.
+          visibility:          string
           avatar_config_override: Json | null
           level_override:       number | null
           level_override_reason: string | null
@@ -173,6 +186,7 @@ export type Database = {
           back_occupancy?:      number
           sleeves_occupancy?:   number
           is_locked?:           boolean
+          visibility?:          string
           avatar_config_override?: Json | null
           level_override?:       number | null
           level_override_reason?: string | null
@@ -185,6 +199,7 @@ export type Database = {
           back_occupancy?:      number
           sleeves_occupancy?:   number
           is_locked?:           boolean
+          visibility?:          string
           avatar_config_override?: Json | null
           level_override?:       number | null
           level_override_reason?: string | null
@@ -213,6 +228,13 @@ export type Database = {
           is_flagged:     boolean
           flag_count:     number
           is_hidden:      boolean
+          // v2 approval reveal queue (doc 07). 'approved' is the default so open
+          // and circle shirts behave exactly as before. A 'pending' scribble is
+          // visible to its author and the shirt owner and nobody else, so
+          // approval gates the reveal, never the drawing.
+          approval_status: string
+          decided_at:     string | null
+          decided_by:     string | null
           created_at:     string
         }
         Insert: {
@@ -285,25 +307,19 @@ export type Database = {
         }
         Relationships: []
       }
-      scribble_requests: {
-        Row: {
-          id:           string
-          requester_id: string
-          owner_id:     string
-          status:       string
-          created_at:   string
-          responded_at: string | null
-        }
-        Insert: {
-          id?:           string
-          requester_id:  string
-          owner_id:      string
-          status?:       string
-        }
-        Update: {
-          status?:       string
-          responded_at?: string | null
-        }
+      // Replaced by `shirt_circle` + `shirt_blocks` — see migration 005. The v1
+      // request-before-drawing flow is gone; approval in v2 is a reveal queue on
+      // the scribble, so nobody asks permission before drawing.
+      shirt_circle: {
+        Row:    { shirt_id: string; user_id: string; added_by: string; created_at: string }
+        Insert: { shirt_id: string; user_id: string; added_by: string }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      shirt_blocks: {
+        Row:    { shirt_id: string; blocked_id: string; reason: string | null; created_at: string }
+        Insert: { shirt_id: string; blocked_id: string; reason?: string | null }
+        Update: { reason?: string | null }
         Relationships: []
       }
       friend_groups: {
@@ -695,7 +711,8 @@ export type AcademicGroupRow  = Database['public']['Tables']['academic_groups'][
 export type ProgramRow        = Database['public']['Tables']['programs']['Row']
 export type BatchRow          = Database['public']['Tables']['batches']['Row']
 export type FriendGroupRow    = Database['public']['Tables']['friend_groups']['Row']
-export type ScribbleRequestRow = Database['public']['Tables']['scribble_requests']['Row']
+export type ShirtCircleRow    = Database['public']['Tables']['shirt_circle']['Row']
+export type ShirtBlockRow     = Database['public']['Tables']['shirt_blocks']['Row']
 export type ScribbleReactionRow = Database['public']['Tables']['scribble_reactions']['Row']
 export type ShirtSocialNoteRow = Database['public']['Tables']['shirt_social_notes']['Row']
 export type ExportRequestRow = Database['public']['Tables']['export_requests']['Row']

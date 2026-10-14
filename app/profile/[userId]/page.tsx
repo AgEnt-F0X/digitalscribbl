@@ -74,7 +74,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
   const { data: shirts } = await supabase
     .from('shirts')
-    .select('id, owner_id, group_id, shirt_number, front_texture_url, back_texture_url, sleeves_texture_url, front_occupancy, back_occupancy, sleeves_occupancy, is_locked, avatar_config_override, level_override, level_override_reason, created_at')
+    .select('id, owner_id, group_id, shirt_number, front_texture_url, back_texture_url, sleeves_texture_url, front_occupancy, back_occupancy, sleeves_occupancy, is_locked, visibility, avatar_config_override, level_override, level_override_reason, created_at')
     .eq('owner_id', targetId)
     .order('shirt_number')
 
