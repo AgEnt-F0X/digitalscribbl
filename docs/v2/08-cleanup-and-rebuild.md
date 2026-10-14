@@ -158,3 +158,82 @@ are colliding.** Two consequences for this plan:
 | Approval inbox on dashboard | A count badge, never a list of names |
 
 ---
+
+### Build order — fixed by the November wall
+
+Each step is independently shippable. Steps 1–4 are what open the signing window;
+5–6 are what make it safe to be open by default.
+
+**Step 1 · Close the hole (minutes, unblocked, do first)**
+`safetyAccess.ts:15` — `return allowedDomains.length === 0 || ...` returns `true`
+when `NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS` is empty, so every Google account is a
+verified student. Fail closed. Flagged in the Phase 2 notes since September and
+never fixed.
+
+**Step 2 · Land the schema**
+Apply `v2/001` → `004` to the new project. Regenerate `lib/supabase/types.ts` —
+do **not** hand-type it (all the `as unknown as X` casts in the app are the cost
+of doing that last time). `visibility` must appear on `shirts`.
+
+**Step 3 · Swap the gates (this alone is the product change)**
+Replace `canAttemptScribble` with `canSignShirt()` at the four gates, reading
+`shirts.visibility` + `shirt_circle` + `shirt_blocks`. Default `open`.
+Consequence: **batch stops being an access gate and becomes a filter.** Most of
+the dropoff in [07](./07-groups-privacy-and-safety.md) disappears at this step.
+
+**Step 4 · Unblock onboarding**
+Delete the cascade. One enrolment-number field → server-side roster lookup fills
+name + program. Make batch optional (an Explore filter, editable later, never
+required). Verification falls back to *provisional + admin review* rather than a
+dead end, because `no_provider` is still true and a student must be able to get a
+shirt today. Keep the WhatsApp share step — it is the growth loop and
+non-negotiable.
+
+**Step 5 · Owner safety chrome (this is what makes step 3 acceptable)**
+- `who can sign` chip on the shirt view: `open` / `circle` / `approval`
+- Block button on any scribble + a short block list
+- Approval inbox on the dashboard: a count badge, approve/decline, no reason
+  field, no timestamp on a decline
+
+**Step 6 · Retire the old model**
+Delete everything in the DELETE table, including the third request caller in
+`NotificationBell.tsx:33`.
+
+**Then, and only then:** 6a seal + public yearbook, 7a hardening (hide / report /
+suspend + `writeAdminAuditLog` actually called — v1 wrote the helper and never
+wired it). Groups stay deferred (D11).
+
+### Traps — all three have bitten or will
+
+1. **Pending scribbles leak into public counts.** Every read filtering only on
+   `is_hidden` — `profile/[userId]:85-96`, `explore:89-93`, dashboard counts —
+   must add `approval_status = 'approved'` the moment the column exists. Pages on
+   the user-scoped client get it free from the `scribbles_read` policy; **`place`
+   and `remove` use the service client and must filter explicitly.**
+2. **`place:391` returns a `thank_you_message` immediately.** For a pending
+   scribble that copy must read "waiting for their okay" or it is a lie.
+3. **Keep the phase guard** (`v2/003:136`). Approving reveals content, so it is a
+   write to the sealed artifact.
+
+### Definition of done
+
+- [ ] A Google account that is not on the allowlist **cannot** reach a shirt
+- [ ] A student gets a shirt having typed **one** number, no dropdowns
+- [ ] A friend opening a shared link **draws immediately** on a default shirt
+- [ ] An owner can hide, block, and switch mode in **one place, one tap each**
+- [ ] Nobody outside the author and owner ever sees a pending scribble
+- [ ] Batch appears only as an Explore filter; no code path refuses a signer for
+      being in a different section
+- [ ] `git grep shirt_permission -- app` returns nothing
+- [ ] `tsc --noEmit` clean, `npm test` green, `npm run build` passes
+- [ ] `docs/v2/08` drift notes added at the end of each step
+
+### Working rules for the rebuild
+
+1. Stage by path. Never `git add -A`, never `git clean -fd` (see Part 1).
+2. `npm run build` before any push — typecheck and vitest are not enough, and
+   `.env.local` points at a deleted Supabase project, so runtime needs a fresh
+   one before the flows can be clicked through.
+3. Update this doc in the same session as the change. Do not let chat outrun the
+   spec.
+4. If a step slips, cut its scope. The seal does not move.

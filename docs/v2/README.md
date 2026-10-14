@@ -18,6 +18,7 @@ This folder is the living spec for the **clean rebuild**: new Supabase schema, C
 | 05 | [Build phases](./05-build-phases.md) | Implementation order. Update this when a phase starts. |
 | 06 | [Open decisions](./06-open-decisions.md) | Unlocked calls. Empty this as we lock them into 01–04. |
 | 07 | [Groups, privacy & the one-door model](./07-groups-privacy-and-safety.md) | **Locked 2026-09-26.** Who may sign what, the approval reveal queue, blocks, and the audited dropoff journeys |
+| 08 | [Cleanup ledger & rebuild plan](./08-cleanup-and-rebuild.md) | **Locked 2026-10-14.** Verified dead-code ledger, and the build order for wiring the v2 model in |
 
 ## One-line product
 

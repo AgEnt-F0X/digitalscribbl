@@ -15,7 +15,7 @@
 | D9 | Public profiles via PostgREST or only Next.js server render? | Lean **server render** so email/enrollment can never leak | Phase 6 |
 | D10 | Guest: still allowed to sign `open` shirts without a request? | **Yes — and now unconditional.** `open` is the default mode and the request flow is being deleted, so a guest with a link signs like anyone. `shirt_blocks` still applies | Onboarding copy |
 | D11 | **Defer groups (Phase 5) past convocation?** | **Closed 2026-09-26 — yes.** Safety no longer depends on groups once `circle` + `approval` + block exist, so nothing on the critical path needs them | — |
-| D12 | **Rollout fork for the one-door model.** D6 says fresh project + no data migrated, but the live app reads `users.shirt_permission` at four gates. Do we (a) apply v2 `001`–`004` to a new DB and rewrite the gates properly, or (b) run `003` additively against the current DB with a `shirt_permission → visibility` backfill and ship in ~3 days? | Lean **(b) for the signing window, then (a)** — every week lost shrinks the November archive, and [05](./05-build-phases.md) says cut scope rather than the date | Phase 2 gates |
+| D12 | **Rollout fork for the one-door model.** | **Closed 2026-10-14 — option (a): rebuild after cleanup.** Apply v2 `001`–`004` to a fresh project and wire the gates properly. Rationale: the two models were fighting in one repo and the faster additive route kept the v1 debt that caused the dropoff. Build order in [08](./08-cleanup-and-rebuild.md) | — |
 
 
 ## Blocking code this week
