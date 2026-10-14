@@ -55,7 +55,9 @@ We missed scribble day in May. Sign the shirts before convocation. In November, 
 - **Closed 2026-09-26:** groups (Phase 5) do defer past convocation — D11. The
   access model is locked in [07](./07-groups-privacy-and-safety.md), and safety no
   longer depends on groups once `circle`, `approval` and block exist.
-- **Open:** the rollout fork only — D12 in [06](./06-open-decisions.md).
+- **Closed 2026-10-14:** rebuild after cleanup (D12, option a). The access model
+  is locked in [07](./07-groups-privacy-and-safety.md) and the build order lives
+  in [08](./08-cleanup-and-rebuild.md).
 
 ## 2026-09-26 audit note
 

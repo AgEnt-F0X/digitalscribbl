@@ -26,11 +26,9 @@ an open question: it is locked in [07](./07-groups-privacy-and-safety.md).
 
 What remains:
 
-- **D12** — the rollout fork. This is the only thing blocking the gate rewrite,
-  because it decides whether migration `003` lands on a fresh project or runs
-  additively against the database the app is currently pointed at.
-- **D9** — confirm server-rendered public profiles (lean: yes). Decides RLS column
-  grants. Still a Phase 6 problem, not a Phase 2 one.
+- **Nothing** — the access model is locked in [07](./07-groups-privacy-and-safety.md)
+  and the rollout fork (D12) is closed. The build order is
+  [08](./08-cleanup-and-rebuild.md).
 
 ## Locked in discussion (already in 01–04)
 
