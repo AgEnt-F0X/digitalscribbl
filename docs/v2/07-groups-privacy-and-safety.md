@@ -195,8 +195,8 @@ shirt gains one chip and one badge. Fewer screens than today.
 
 ## Still open
 
-The **rollout fork** is the only thing blocking code, recorded as D12 in
-[06](./06-open-decisions.md): D6 ("fresh project, no data migrated") and the
-v1-shaped live app pull in opposite directions.
+**Closed 2026-10-14.** The rollout fork was resolved as *rebuild after cleanup* —
+see [08](./08-cleanup-and-rebuild.md) for the verified cleanup ledger and the
+build order. Nothing in this doc is blocked any more.
 
 
