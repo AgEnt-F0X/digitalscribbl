@@ -34,11 +34,8 @@ export const avatarConfigSchema = z.object({
   lockedAt: z.string().datetime().optional(),
 })
 
-export const onboardingCompleteSchema = z.object({
-  displayName: z.string().min(1).max(100),
-  enrollmentNumber: z.string().min(1).max(50),
-  batchId: z.string().uuid(),
-  academicGroupId: z.string().uuid(),
-  programId: z.string().uuid(),
-  avatarConfig: avatarConfigSchema,
-})
+// `onboardingCompleteSchema` was removed with the school→program→batch cascade.
+// Onboarding now takes one enrollment number plus an optional section, and is
+// validated by `completeSchema` in app/api/onboarding/complete/route.ts — which
+// also re-checks the roster pairing server-side. See docs/v2/07.
+

@@ -5,56 +5,43 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PlaceBackground from '@/components/place/PlaceBackground'
 import DriftingDoodles from '@/components/brand/DriftingDoodles'
-import InkUnderline from '@/components/forms/InkUnderline'
-import { Sparkles, Camera, ArrowRight, CheckCircle2, HelpCircle, X, School } from 'lucide-react'
+import { Sparkles, Camera, ArrowRight, CheckCircle2 } from 'lucide-react'
 
-interface SchoolOption {
-  id: string
-  name: string
-}
-
-interface ProgramOption {
-  id: string
-  academic_group_id: string
-  name: string
-}
-
-interface BatchOption {
-  id: string
-  program_id: string
-  graduation_year: number
-  label: string
+interface LookupResult {
+  found: boolean
+  code?: string
+  program?: {
+    id: string
+    key: string
+    name: string
+    batchesEnabled: boolean
+    batchCount: number | null
+  } | null
+  graduationYear?: number | null
 }
 
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
-  const [step, setStep] = useState<1 | 2>(1)
   const [userId, setUserId] = useState<string | null>(null)
-  
-  // Step 1 State
+
+  // Step 1: who you are.
   const [displayName, setDisplayName] = useState('')
   const [enrollmentNumber, setEnrollmentNumber] = useState('')
   const [pfpUrl, setPfpUrl] = useState<string | null>(null)
   const [isUploadingPfp, setIsUploadingPfp] = useState(false)
 
-  // Step 2 State (Cascading Academic Data)
-  const [schools, setSchools] = useState<SchoolOption[]>([])
-  const [programs, setPrograms] = useState<ProgramOption[]>([])
-  const [batches, setBatches] = useState<BatchOption[]>([])
-  
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('')
-  const [selectedProgramId, setSelectedProgramId] = useState<string>('')
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('')
+  // The roster says which program this number belongs to. No school dropdown,
+  // no program dropdown: the student cannot pick a school, and the server
+  // re-verifies the pairing at completion, so a tampered program id fails.
+  const [lookingUp, setLookingUp] = useState(false)
+  const [lookup, setLookup] = useState<LookupResult | null>(null)
 
-  // Unlisted Program Modal State
-  const [showRequestModal, setShowRequestModal] = useState(false)
-  const [reqSchool, setReqSchool] = useState('')
-  const [reqProgram, setReqProgram] = useState('')
-  const [reqBatch, setReqBatch] = useState('Class of 2026')
-  const [isSubmittingReq, setIsSubmittingReq] = useState(false)
-  const [reqSubmitted, setReqSubmitted] = useState(false)
+  // Batch is an Explore filter, never a gate. Sending null is the normal path
+  // for every course-wide program; an out-of-range CSE batch falls back to
+  // course scope server-side instead of erroring.
+  const [batch, setBatch] = useState<string>('')
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -88,59 +75,13 @@ export default function OnboardingPage() {
         return
       }
 
-      // Fetch Academic Hierarchy Data
-      const { data: schoolRows } = await supabase.from('academic_groups').select('id, name').order('name')
-      const { data: programRows } = await supabase.from('programs').select('id, academic_group_id, name').order('name')
-      const { data: batchRows } = await supabase.from('batches').select('id, program_id, graduation_year, label').order('graduation_year', { ascending: false })
-
-      if (schoolRows && schoolRows.length > 0) {
-        setSchools(schoolRows)
-        // Default to CS school if available
-        const csSchool = schoolRows.find(s => s.name.toLowerCase().includes('computer')) ?? schoolRows[0]
-        setSelectedSchoolId(csSchool.id)
-      }
-
-      if (programRows && programRows.length > 0) {
-        setPrograms(programRows)
-      }
-
-      if (batchRows && batchRows.length > 0) {
-        setBatches(batchRows)
-      }
+      // There is no academic dropdown to fill. The roster is the only source of
+      // which program this student is in, and it is looked up server-side from
+      // the enrollment number — never shipped to the browser in full.
     }
 
     bootstrap()
   }, [router, supabase])
-
-  // Filtered Programs based on Selected School
-  const availablePrograms = useMemo(() => {
-    if (!selectedSchoolId) return programs
-    return programs.filter(p => p.academic_group_id === selectedSchoolId)
-  }, [programs, selectedSchoolId])
-
-  // Auto-select first program when school changes
-  useEffect(() => {
-    if (availablePrograms.length > 0) {
-      setSelectedProgramId(availablePrograms[0].id)
-    } else {
-      setSelectedProgramId('')
-    }
-  }, [availablePrograms])
-
-  // Filtered Batches based on Selected Program
-  const availableBatches = useMemo(() => {
-    if (!selectedProgramId) return batches
-    return batches.filter(b => b.program_id === selectedProgramId)
-  }, [batches, selectedProgramId])
-
-  // Auto-select first batch when program changes
-  useEffect(() => {
-    if (availableBatches.length > 0) {
-      setSelectedBatchId(availableBatches[0].id)
-    } else {
-      setSelectedBatchId('')
-    }
-  }, [availableBatches])
 
   // Handle PFP Upload
   const handlePfpUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,61 +114,68 @@ export default function OnboardingPage() {
     }
   }
 
-  // Handle Unlisted Program Request
-  const handleSubmitRequest = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!reqSchool || !reqProgram || !reqBatch) return
+  // Lookup the program for the typed number. Deliberately separate from the
+  // completion call so the student SEES what the roster says before committing:
+  // "we found you in B.Tech CSE — continue?" is trust; a silent bind is not.
+  const handleLookup = async () => {
+    const trimmed = enrollmentNumber.trim()
+    if (!trimmed) {
+      setError('Type your enrollment number first.')
+      return
+    }
 
-    setIsSubmittingReq(true)
+    setLookingUp(true)
+    setError(null)
+    setLookup(null)
+
     try {
-      const res = await fetch('/api/onboarding/request-program', {
+      const res = await fetch('/api/onboarding/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          schoolName: reqSchool,
-          programName: reqProgram,
-          batchLabel: reqBatch,
-        }),
+        body: JSON.stringify({ enrollment: trimmed }),
       })
 
-      if (res.ok) {
-        setReqSubmitted(true)
-        setTimeout(() => {
-          setShowRequestModal(false)
-          setReqSubmitted(false)
-        }, 2000)
+      if (!res.ok) {
+        setError('Could not look that up. Try again in a moment.')
+        return
+      }
+
+      const data = await res.json() as LookupResult
+      setLookup(data)
+
+      if (!data.found) {
+        setError(
+          data.code === 'invalid'
+            ? 'That does not look like an enrollment number. Check it and try again.'
+            : 'That number is not on the convocation list we have. Check it and try again, or ask an admin.',
+        )
+      } else if (data.program) {
+        setBatch('')
       }
     } catch {
-      /* ignore */
+      setError('Could not look that up. Try again in a moment.')
     } finally {
-      setIsSubmittingReq(false)
+      setLookingUp(false)
     }
   }
 
   // Complete Onboarding
   const handleComplete = async () => {
-    if (!userId || !displayName.trim() || !enrollmentNumber.trim()) {
-      setError('Please fill in your name and enrollment number.')
+    if (!userId || !displayName.trim() || !lookup?.found || !lookup.program?.id) {
+      setError('Look up your enrollment number first, then finish.')
       return
     }
 
     setSaving(true)
     setError(null)
 
+    const batchNumber = batch.trim() === '' ? null : Number(batch)
+
     const payload = {
       displayName: displayName.trim(),
       enrollmentNumber: enrollmentNumber.trim(),
-      academicGroupId: selectedSchoolId,
-      programId: selectedProgramId,
-      batchId: selectedBatchId,
-      avatarConfig: {
-        presetId: 'm-classic-straight',
-        skinToneId: 'skin_03',
-        skinTone: { depth: 50, undertone: 50, hex: '#e5b899' },
-        headSource: pfpUrl ? 'upload' : 'skipped',
-        frontFaceImageUrl: pfpUrl ?? undefined,
-        lockedAt: new Date().toISOString(),
-      },
+      programId: lookup.program.id,
+      batch: batchNumber,
     }
 
     try {
@@ -252,9 +200,7 @@ export default function OnboardingPage() {
     }
   }
 
-  const selectedSchoolObj = schools.find(s => s.id === selectedSchoolId)
-  const selectedProgramObj = programs.find(p => p.id === selectedProgramId)
-  const selectedBatchObj = batches.find(b => b.id === selectedBatchId)
+  const program = lookup?.found ? lookup.program : null
 
   return (
     <div className="relative min-h-screen bg-paper-100 text-ink-900 selection:bg-amber-200">
@@ -268,7 +214,7 @@ export default function OnboardingPage() {
             <span className="text-amber-600 text-3xl">✨</span> scribbl
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            <span>Step {step} of 2</span>
+            <span>One number · one minute</span>
           </div>
         </div>
       </header>
@@ -294,15 +240,17 @@ export default function OnboardingPage() {
               </div>
 
               <h2 className="font-display font-black text-xl text-ink-900 truncate max-w-full">
-                {displayName || 'Your Full Name'}
+                {displayName || 'Your name'}
               </h2>
               <p className="text-xs font-mono text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md mt-1 border border-amber-200">
-                {enrollmentNumber || 'Enrollment Number'}
+                {enrollmentNumber.trim() || 'Enrollment number'}
               </p>
 
               <div className="mt-4 pt-4 border-t border-paper-200 w-full text-xs text-gray-600 flex flex-col gap-1">
-                <p className="font-medium text-ink-800">{selectedSchoolObj?.name ?? 'Bennett University'}</p>
-                <p className="text-gray-500">{selectedProgramObj?.name ?? 'Program'} · {selectedBatchObj?.label ?? 'Class of 2026'}</p>
+                <p className="font-medium text-ink-800">{program?.name ?? 'Bennett University'}</p>
+                <p className="text-gray-500">
+                  {batch.trim() !== '' && program?.batchesEnabled ? `Batch ${batch.trim()}` : 'Class of 2026'}
+                </p>
               </div>
 
               <div className="mt-4 px-3 py-1.5 rounded-full bg-paper-100 text-[11px] font-semibold text-gray-500 border border-paper-300">
@@ -311,11 +259,11 @@ export default function OnboardingPage() {
             </div>
 
             <p className="text-xs text-gray-500 text-center mt-3 max-w-xs">
-              Don’t worry! You can personalize your full 3D Avatar & AI head anytime inside your dashboard after setup.
+              Your shirt is created the moment you finish — open to signatures, no setup.
             </p>
           </div>
 
-          {/* Right Column: Step Controls Form */}
+          {/* Right Column: The one screen */}
           <div className="lg:col-span-7 bg-white/95 backdrop-blur-md p-6 sm:p-8 rounded-3xl border-2 border-paper-300 shadow-xl">
             {error && (
               <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
@@ -323,224 +271,133 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {step === 1 ? (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Phase 1 · Step 1</span>
-                  <h2 className="font-display font-black text-2xl sm:text-3xl text-ink-900 mt-1">
-                    Student Identity & Photo
-                  </h2>
-                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                    Enter your display name and upload a real profile photo so classmates can easily identify you.
-                  </p>
-                </div>
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="font-display font-black text-2xl sm:text-3xl text-ink-900 mt-1">
+                  What is your enrollment number?
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  That is the whole sign-up. The convocation list confirms your program — there is nothing to pick.
+                </p>
+              </div>
 
-                {/* Display Name Input */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                    Full Display Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Rudra Prasad"
-                    className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-sans text-sm focus:outline-none focus:border-amber-500 focus:bg-white transition"
-                  />
-                  <InkUnderline active={displayName.length > 0} />
-                </div>
+              {/* Display Name Input */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  What should classmates call you? *
+                </label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="e.g. Aarav Sharma"
+                  className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
+                />
+              </div>
 
-                {/* Enrollment Number Input */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                    Roll / Enrollment Number *
-                  </label>
+              {/* Enrollment Input + Lookup */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  Enrollment number *
+                </label>
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={enrollmentNumber}
-                    onChange={(e) => setEnrollmentNumber(e.target.value)}
-                    placeholder="e.g. E22CSEU1042"
-                    className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-mono text-sm focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                    onChange={(e) => {
+                      setEnrollmentNumber(e.target.value)
+                      setLookup(null)
+                    }}
+                    placeholder="As printed on your ID card"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="flex-1 px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-mono uppercase"
                   />
-                  <InkUnderline active={enrollmentNumber.length > 0} />
-                </div>
-
-                {/* PFP Upload Option */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                    Profile Photo (PFP)
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-paper-200 border border-paper-300 text-ink-900 font-semibold text-xs hover:bg-paper-300 transition shadow-sm">
-                      <Camera className="w-4 h-4 text-amber-600" />
-                      <span>{pfpUrl ? 'Change Photo' : 'Upload Photo'}</span>
-                      <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handlePfpUpload} className="hidden" />
-                    </label>
-                    <span className="text-xs text-gray-500">PNG, JPG or WebP (max 5MB)</span>
-                  </div>
-                </div>
-
-                {/* Next Step Button */}
-                <button
-                  onClick={() => {
-                    if (!displayName.trim() || !enrollmentNumber.trim()) {
-                      setError('Please enter your full name and enrollment number.')
-                      return
-                    }
-                    setError(null)
-                    setStep(2)
-                  }}
-                  className="mt-4 w-full py-4 rounded-2xl bg-amber-600 text-white font-display font-bold text-base hover:bg-amber-700 transition shadow-md flex items-center justify-center gap-2"
-                >
-                  <span>Continue to School & Batch</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Phase 1 · Step 2</span>
-                  <h2 className="font-display font-black text-2xl sm:text-3xl text-ink-900 mt-1">
-                    Select Your School & Program
-                  </h2>
-                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                    Select your Bennett University academic school, degree program, and graduation batch.
-                  </p>
-                </div>
-
-                {/* CSE Launch Focus Card */}
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 shadow-sm flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
-                      Active Launch Focus
-                    </span>
-                    <span className="text-xs font-bold text-amber-700">Class of 2026</span>
-                  </div>
-                  <h3 className="font-display font-black text-lg text-ink-900 mt-1">
-                    School of Computer Science & Engineering
-                  </h3>
-                  <p className="text-xs text-gray-600 font-sans">
-                    Program: <strong className="text-ink-900">B.Tech Computer Science (CSE)</strong>
-                  </p>
-                </div>
-
-                {/* Contact Me / Request Course Button */}
-                <div className="p-4 rounded-xl bg-paper-100 border border-paper-300 flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="text-left text-xs">
-                    <p className="font-bold text-ink-900">From another school or course?</p>
-                    <p className="text-gray-500">Contact me to add your school and batch immediately.</p>
-                  </div>
                   <button
                     type="button"
-                    onClick={() => setShowRequestModal(true)}
-                    className="shrink-0 px-4 py-2 rounded-xl bg-white border border-amber-400 text-amber-900 font-bold text-xs hover:bg-amber-50 transition shadow-xs flex items-center gap-1.5"
+                    onClick={handleLookup}
+                    disabled={lookingUp || enrollmentNumber.trim().length === 0}
+                    className="px-5 py-3 rounded-xl bg-ink-900 text-white text-sm font-bold hover:bg-ink-800 transition disabled:opacity-50 shrink-0"
                   >
-                    <HelpCircle className="w-4 h-4 text-amber-600" />
-                    <span>Contact Me / Add Course</span>
+                    {lookingUp ? 'Checking…' : 'Check'}
                   </button>
                 </div>
 
-                {/* Buttons */}
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="px-6 py-4 rounded-2xl bg-paper-200 border border-paper-300 text-ink-800 font-semibold text-sm hover:bg-paper-300 transition"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleComplete}
-                    disabled={saving}
-                    className="flex-1 py-4 rounded-2xl bg-amber-600 text-white font-display font-bold text-base hover:bg-amber-700 transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {saving ? (
-                      <span>Saving Profile...</span>
-                    ) : (
-                      <>
-                        <Sparkles className="w-5 h-5" />
-                        <span>Complete Setup & Enter App</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                {lookup?.found && lookup.program && (
+                  <div className="mt-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
+                    <span>
+                      Found you in <strong>{lookup.program.name}</strong>
+                      {lookup.graduationYear ? ` · Class of ${lookup.graduationYear}` : ''}.
+                      Is that right?
+                    </span>
+                  </div>
+                )}
+
+                {lookup?.found && !lookup.program && (
+                  <div className="mt-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                    That number is on the list, but its program is not open yet. Talk to an admin and we will add it.
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Optional batch — only when the program actually has sections */}
+              {lookup?.found && program?.batchesEnabled && (program.batchCount ?? 0) > 0 && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                    Section <span className="text-gray-400 font-normal">(optional — just helps friends find you)</span>
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={program.batchCount ?? 52}
+                    value={batch}
+                    onChange={(e) => setBatch(e.target.value)}
+                    placeholder="Leave blank if unsure"
+                    className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
+                  />
+                </div>
+              )}
+
+              {/* PFP Upload */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  Photo <span className="text-gray-400 font-normal">(optional for now)</span>
+                </label>
+                <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-paper-300 bg-paper-100/40 cursor-pointer hover:border-amber-400 transition">
+                  <Camera className="w-5 h-5 text-gray-400" />
+                  <span className="text-xs text-gray-600 font-sans">
+                    {pfpUrl ? 'Change photo' : 'Add a photo so classmates recognise you'}
+                  </span>
+                  <input type="file" accept="image/*" onChange={handlePfpUpload} className="hidden" />
+                </label>
+              </div>
+
+              {/* The roster has confirmed the program above, so this is one tap. */}
+              <button
+                onClick={handleComplete}
+                disabled={saving || !lookup?.found || !lookup.program?.id}
+                className="py-4 rounded-2xl bg-amber-600 text-white font-display font-bold text-base hover:bg-amber-700 transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {saving ? (
+                  <span>Creating your shirt…</span>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    <span>Get my shirt</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+
+              <p className="text-[11px] text-gray-400 text-center font-sans">
+                Your shirt stays open for signatures unless you change it in Settings.
+              </p>
+            </div>
           </div>
         </div>
       </main>
-
-      {/* Unlisted Program Request Modal */}
-      {showRequestModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border-2 border-paper-300 shadow-2xl p-6 sm:p-8 max-w-md w-full relative">
-            <button
-              onClick={() => setShowRequestModal(false)}
-              className="absolute top-4 right-4 p-1 rounded-full hover:bg-paper-100 text-gray-400 hover:text-ink-900"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2 mb-2">
-              <School className="w-5 h-5 text-amber-600" />
-              <h3 className="font-display font-bold text-xl text-ink-900">Request Course / Batch</h3>
-            </div>
-            <p className="text-xs text-gray-600 mb-6">
-              Let us know which school or program you belong to, and we will activate it in the database immediately!
-            </p>
-
-            {reqSubmitted ? (
-              <div className="py-6 text-center text-emerald-800 font-semibold text-sm flex flex-col items-center gap-2">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-                <span>Request Logged! We will add your course right away.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitRequest} className="flex flex-col gap-4 text-xs">
-                <div>
-                  <label className="block font-bold uppercase text-gray-700 mb-1">School Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={reqSchool}
-                    onChange={(e) => setReqSchool(e.target.value)}
-                    placeholder="e.g. School of Media & Liberal Arts"
-                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold uppercase text-gray-700 mb-1">Program Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={reqProgram}
-                    onChange={(e) => setReqProgram(e.target.value)}
-                    placeholder="e.g. BA Journalism & Mass Comm"
-                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold uppercase text-gray-700 mb-1">Graduation Batch</label>
-                  <input
-                    type="text"
-                    required
-                    value={reqBatch}
-                    onChange={(e) => setReqBatch(e.target.value)}
-                    placeholder="e.g. Class of 2026"
-                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmittingReq}
-                  className="mt-2 py-3 rounded-xl bg-ink-900 text-white font-bold hover:bg-ink-800 transition"
-                >
-                  {isSubmittingReq ? 'Submitting...' : 'Submit Program Request'}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

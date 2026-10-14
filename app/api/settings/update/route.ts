@@ -7,14 +7,14 @@ const ALLOWED_FIELDS = [
   'display_name',
   'yearbook_quote',
   'thank_you_message',
-  'shirt_permission',
   'body_style',
   'shirt_color',
 ] as const
 
 type AllowedField = (typeof ALLOWED_FIELDS)[number]
 
-const VALID_PERMISSIONS = ['open', 'batch_only', 'request_only', 'locked']
+// `shirt_permission` is gone. The access mode lives on the SHIRT now and is
+// written by PATCH /api/shirt/access, so there is nothing to validate here.
 const VALID_BODY_STYLES  = ['M1', 'M2', 'M3', 'F1', 'F2', 'F3']
 const VALID_SHIRT_COLORS = ['#F8F8F8', '#F5F0E0', '#1C1C1C', '#1E3A5F', '#6B8E6B']
 
@@ -52,11 +52,6 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Thank-you message must be under 180 characters' }, { status: 422 })
       }
       updates[field] = val === '' ? null : val
-    } else if (field === 'shirt_permission') {
-      if (!VALID_PERMISSIONS.includes(val as string)) {
-        return NextResponse.json({ error: 'Invalid shirt_permission' }, { status: 422 })
-      }
-      updates[field] = val
     } else if (field === 'body_style') {
       if (!VALID_BODY_STYLES.includes(val as string)) {
         return NextResponse.json({ error: 'Invalid body_style' }, { status: 422 })

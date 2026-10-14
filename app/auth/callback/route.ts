@@ -59,7 +59,6 @@ export async function GET(req: NextRequest) {
       email:        user.email,
       display_name: user.user_metadata?.full_name ?? user.email!.split('@')[0],
       onboarding_completed: !isUniversity,
-      shirt_permission: isUniversity ? 'open' : 'locked',
       is_university_verified: isUniversity,
       is_guest: !isUniversity,
     })
@@ -77,17 +76,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${origin}/onboarding/guest`)
   }
 
+  // No permission to reconcile: a shirt's mode belongs to the shirt and defaults
+  // to 'open', so returning users are never silently locked out on sign-in.
   const profileUpdates: {
     last_seen: string
     is_university_verified: boolean
     is_guest: boolean
-    shirt_permission?: string
   } = {
     last_seen: new Date().toISOString(),
     is_university_verified: isUniversity,
     is_guest: !isUniversity,
   }
-  if (!isUniversity) profileUpdates.shirt_permission = 'locked'
 
   await db
     .from('users')

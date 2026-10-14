@@ -64,9 +64,9 @@ const ROUTE_NODES: RouteNode[] = [
     title: 'Mobile Signing Studio',
     access: 'Authenticated',
     description: 'Interactive canvas where friends draw freehand scribbles, place text notes, drop stickers, and leave voice notes.',
-    dbTables: ['shirts', 'scribbles', 'scribble_requests', 'scribble_reactions'],
+    dbTables: ['shirts', 'scribbles', 'scribble_reactions', 'shirt_circle', 'shirt_blocks'],
     storageUsed: 'Supabase Realtime + Vector SVG / Cloudinary',
-    notes: 'Uses Fabric.js pencil brush. Validates batch proximity and request permissions via safetyAccess helper.',
+    notes: 'Uses Fabric.js pencil brush. Access resolved once by lib/identity/access; the shirt visibility + circle + block decide, batch never gates.',
   },
   {
     path: '/yearbook',

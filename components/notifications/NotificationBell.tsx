@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import { cn } from '@/lib/utils/cn'
 import { formatDistanceToNow } from 'date-fns'
@@ -10,10 +11,13 @@ interface NotificationBellProps {
 }
 
 export default function NotificationBell({ userId }: NotificationBellProps) {
+  const router = useRouter()
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications(userId)
   const [open, setOpen]                 = useState(false)
-  const [pendingRequests, setPendingRequests] = useState<Set<string>>(new Set())
-  const [handledRequests, setHandledRequests] = useState<Record<string, 'approved' | 'rejected'>>({})
+  // Approval queue for pproval shirts (doc 07). Keyed by scribble, not by
+  // person: the decision is about one drawing, not about someone's access.
+  const [deciding, setDeciding] = useState<Set<string>>(new Set())
+  const [decisions, setDecisions] = useState<Record<string, 'approved' | 'rejected'>>({})
 
   const handleToggle = () => {
     // Mark all as read when the panel CLOSES (user had a chance to see them)
@@ -21,26 +25,27 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
     setOpen(v => !v)
   }
 
-  const handleRequest = async (
-    requesterId:    string,
-    action:         'approved' | 'rejected',
+  const handleDecision = async (
+    scribbleId:     string,
+    decision:       'approved' | 'rejected',
     notificationId: string,
   ) => {
-    if (pendingRequests.has(requesterId)) return
-    setPendingRequests(prev => new Set([...prev, requesterId]))
+    if (deciding.has(scribbleId)) return
+    setDeciding(prev => new Set([...prev, scribbleId]))
 
     try {
-      await fetch('/api/scribble/request', {
-        method:  'PATCH',
+      await fetch('/api/scribble/approve', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ requester_id: requesterId, action }),
+        body:    JSON.stringify({ scribble_id: scribbleId, decision }),
       })
-      setHandledRequests(prev => ({ ...prev, [requesterId]: action }))
+      setDecisions(prev => ({ ...prev, [scribbleId]: decision }))
       markRead(notificationId)
+      router.refresh()
     } finally {
-      setPendingRequests(prev => {
-        const next = new Set(prev)
-        next.delete(requesterId)
+      setDeciding(prev => {
+        const next = new Set([...prev])
+        next.delete(scribbleId)
         return next
       })
     }
@@ -95,19 +100,22 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
                 </div>
               ) : (
                 notifications.map(n => {
-                  const isRequest     = n.type === 'request_received'
-                  const requesterId   = n.related_user_id
-                  const handled       = requesterId ? handledRequests[requesterId] : undefined
-                  const isPending     = requesterId ? pendingRequests.has(requesterId) : false
+                  // `scribble_pending_approval` is the owner's decision prompt for
+                  // an `approval` shirt. Keyed by the scribble, because the
+                  // decision is about one drawing.
+                  const isApproval    = n.type === 'scribble_pending_approval'
+                  const scribbleId    = n.related_scribble_id
+                  const decided       = scribbleId ? decisions[scribbleId] : undefined
+                  const isDeciding    = scribbleId ? deciding.has(scribbleId) : false
 
                   return (
                     <div
                       key={n.id}
-                      onClick={() => !isRequest && markRead(n.id)}
+                      onClick={() => !isApproval && markRead(n.id)}
                       className={cn(
                         'px-4 py-3 transition',
                         !n.is_read && 'bg-paper-100',
-                        !isRequest && 'cursor-pointer hover:bg-gray-50',
+                        !isApproval && 'cursor-pointer hover:bg-gray-50',
                       )}
                     >
                       <div className="flex items-start gap-2">
@@ -124,37 +132,37 @@ export default function NotificationBell({ userId }: NotificationBellProps) {
                           </p>
 
                           {/* Approve / Reject for scribble requests */}
-                          {isRequest && requesterId && (
+                          {isApproval && scribbleId && (
                             <div className="mt-2">
-                              {handled ? (
+                              {decided ? (
                                 <p className={cn(
                                   'text-xs font-medium',
-                                  handled === 'approved' ? 'text-green-600' : 'text-red-500',
+                                  decided === 'approved' ? 'text-green-600' : 'text-red-500',
                                 )}>
-                                  {handled === 'approved' ? '✓ Approved' : '✗ Declined'}
+                                  {decided === 'approved' ? '✓ Approved' : '✗ Not posted'}
                                 </p>
                               ) : (
                                 <div className="flex gap-1.5">
                                   <button
-                                    disabled={isPending}
-                                    onClick={e => { e.stopPropagation(); handleRequest(requesterId, 'approved', n.id) }}
+                                    disabled={isDeciding}
+                                    onClick={e => { e.stopPropagation(); handleDecision(scribbleId, 'approved', n.id) }}
                                     className="flex-1 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium transition disabled:opacity-50"
                                   >
-                                    {isPending ? '…' : '✓ Approve'}
+                                    {isDeciding ? '…' : '✓ Post it'}
                                   </button>
                                   <button
-                                    disabled={isPending}
-                                    onClick={e => { e.stopPropagation(); handleRequest(requesterId, 'rejected', n.id) }}
+                                    disabled={isDeciding}
+                                    onClick={e => { e.stopPropagation(); handleDecision(scribbleId, 'rejected', n.id) }}
                                     className="flex-1 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium transition disabled:opacity-50"
                                   >
-                                    {isPending ? '…' : '✗ Decline'}
+                                    {isDeciding ? '…' : '✗ Not this one'}
                                   </button>
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
-                        {!n.is_read && !isRequest && (
+                        {!n.is_read && !isApproval && (
                           <div className="w-2 h-2 rounded-full bg-scribble-blue mt-1.5 flex-shrink-0" />
                         )}
                       </div>

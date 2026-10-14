@@ -16,7 +16,6 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import BottomNav from '@/components/nav/BottomNav'
 import ShirtViewLoader from './ShirtViewLoader'
 import { ActivityLog } from '@/components/activity/ActivityLog'
-import RequestScribbleButton from './RequestScribbleButton'
 import ReportUserButton from './ReportUserButton'
 import ShareButton from '@/app/dashboard/ShareButton'
 import PlaceBackground from '@/components/place/PlaceBackground'
@@ -57,7 +56,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     .from('users')
     .select(`
       id, display_name, body_style, shirt_color, avatar_config,
-      head_front_url, head_back_url, shirt_permission,
+      head_front_url, head_back_url,
       yearbook_quote, is_suspended, batch_id,
       batches(label, graduation_year, programs(name, academic_groups(name)))
     `)

@@ -217,16 +217,51 @@ wired it). Groups stay deferred (D11).
 
 ### Definition of done
 
-- [ ] A Google account that is not on the allowlist **cannot** reach a shirt
-- [ ] A student gets a shirt having typed **one** number, no dropdowns
-- [ ] A friend opening a shared link **draws immediately** on a default shirt
-- [ ] An owner can hide, block, and switch mode in **one place, one tap each**
-- [ ] Nobody outside the author and owner ever sees a pending scribble
-- [ ] Batch appears only as an Explore filter; no code path refuses a signer for
+Status recorded at the pause — 2026-10-14. **Code-complete for all six steps,
+runtime-unverified**: the Supabase project is deleted (`dvqdwvzvfxlqwdxmakao.supabase.co`
+no longer resolves), so nothing has been clicked through.
+
+- [x] A Google account that is not on the allowlist **cannot** reach a shirt
+      — `isAllowedEmailDomain` fails closed, regression-guarded in
+      `tests/safety-access.test.ts`
+- [x] A student gets a shirt having typed **one** number, no dropdowns
+      — `app/onboarding/page.tsx` + `/api/onboarding/lookup` + `/api/onboarding/complete`
+- [x] A friend opening a shared link **draws immediately** on a default shirt
+- [x] An owner can hide, block, and switch mode in **one place, one tap each**
+      — `app/settings/ShirtAccessPanel.tsx`
+- [x] Nobody outside the author and owner ever sees a pending scribble
+- [x] Batch appears only as an Explore filter; no code path refuses a signer for
       being in a different section
-- [ ] `git grep shirt_permission -- app` returns nothing
-- [ ] `tsc --noEmit` clean, `npm test` green, `npm run build` passes
-- [ ] `docs/v2/08` drift notes added at the end of each step
+- [x] `git grep shirt_permission -- app` returns nothing
+- [x] `tsc --noEmit` clean, `npm test` green (116/116), `npm run build` passes
+      (`✓ Compiled successfully in 16.3s`), `eslint` 0 errors
+- [ ] **Runtime end-to-end** — blocked. Needs a fresh Supabase project with
+      migrations `v2/001`–`005` applied and `lib/supabase/types.ts` regenerated
+      from it. See the note on hand-typing below.
+
+### Where this paused
+
+| Step | State |
+|---|---|
+| 1 · Fail closed allowlist | ✅ shipped (`ced33df`) |
+| 2 · Schema + types | ✅ migration `v2/005` + hand-extended `types.ts` (`a1947ee`) |
+| 3 · Four gates through one resolver | ✅ `lib/identity/access.ts` (`31927d5`) |
+| 4 · Onboarding rewrite | ✅ code done, **not runtime-tested** |
+| 5 · Owner chrome | ✅ `ShirtAccessPanel`, `ApprovalInbox`, `/api/shirt/access`, `/api/scribble/approve` |
+| 6 · Retire the old model | ✅ `canAttemptScribble` deleted, 3 request-flow files removed, `shirt_permission` gone from `app/` |
+
+**On hand-typing `types.ts`:** doc 08's working rule 2 says regenerate rather
+than hand-type. That was forced exception this session — with no live project
+there is no source to generate from. **The moment a project exists, run
+`supabase gen types typescript` and diff against `lib/supabase/types.ts`**, then
+drop this note. Until then treat every column in that file as unverified against
+the real schema.
+
+**First thing next session:** create the Supabase project, apply `v2/001`–`005`
+in order, set `NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS` (it is empty, and now fails
+closed — so nobody verifies until it is set), regenerate types, then click the
+journey: sign up → dashboard → sign someone else's shirt → approve/decline →
+block → settings mode switch.
 
 ### Working rules for the rebuild
 

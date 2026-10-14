@@ -27,8 +27,8 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import BottomNav from '@/components/nav/BottomNav'
 import { ActivityLog } from '@/components/activity/ActivityLog'
 import ThankYouMessagePopup from '@/src/features/dashboard/components/ThankYouMessagePopup'
+import ApprovalInbox, { type ApprovalItem } from './ApprovalInbox'
 import ShareButton from './ShareButton'
-import ScribbleRequestActions from './ScribbleRequestActions'
 import PlaceBackground from '@/components/place/PlaceBackground'
 import Whiteboard from '@/components/brand/Whiteboard'
 import AvatarHalo from '@/components/brand/AvatarHalo'
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
     { data: recentOnMyShirt },
     { data: socialNotes },
     { data: shirtScribblerRows },
-    { data: pendingRequests, count: pendingRequestCount },
+    { data: pendingApprovals },
     { data: memberships },
   ] = await Promise.all([
     supabase
@@ -129,20 +129,28 @@ export default async function DashboardPage() {
           .order('created_at', { ascending: false })
           .limit(6)
       : Promise.resolve({ data: [] }),
+    // Distinct signers, for the "scribbled by N friends" tally. Approved only:
+    // a drawing still waiting for the owner is not yet a signature.
     shirt
       ? supabase
           .from('scribbles')
           .select('scribbler_id')
           .eq('shirt_id', shirt.id)
           .eq('is_hidden', false)
+          .eq('approval_status', 'approved')
       : Promise.resolve({ data: [] }),
-    supabase
-      .from('scribble_requests')
-      .select('id, requester_id, created_at', { count: 'exact' })
-      .eq('owner_id', user.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(2),
+    // The owner's approval inbox (doc 07). Under the one-door model nobody asks
+    // permission to draw, so there is no queue of people waiting to be let in —
+    // only a queue of drawings waiting to be revealed.
+    shirt
+      ? supabase
+          .from('scribbles')
+          .select('id, panel, canvas_svg, created_at, scribbler:scribbler_id(id, display_name, body_style, shirt_color, head_front_url, head_back_url, avatar_config)')
+          .eq('shirt_id', shirt.id)
+          .eq('approval_status', 'pending')
+          .eq('is_hidden', false)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
     supabase
       .from('friend_group_members')
       .select(`
@@ -172,18 +180,6 @@ export default async function DashboardPage() {
   for (const member of memberCounts ?? []) {
     groupCountMap[member.group_id] = (groupCountMap[member.group_id] ?? 0) + 1
   }
-
-  const pendingRequesterIds = (pendingRequests ?? []).map(request => request.requester_id)
-  const { data: pendingRequesterUsers } = pendingRequesterIds.length
-    ? await supabase
-        .from('users')
-        .select('id, display_name, body_style, shirt_color, head_front_url, avatar_config')
-        .in('id', pendingRequesterIds)
-    : { data: [] }
-
-  const pendingRequesterMap = Object.fromEntries(
-    (pendingRequesterUsers ?? []).map(requester => [requester.id, requester])
-  )
 
   const queueCountMap: Record<string, number> = {}
   for (const s of queueScribbles ?? []) {
@@ -248,22 +244,12 @@ export default async function DashboardPage() {
       href: ROUTES.group(group.id),
     }
   })
-  const displayGroups = groups.length > 0
-    ? groups
-    : [
-        {
-          id: 'batch',
-          name: batch?.label ?? `${batch?.graduation_year ?? 'Farewell'} batch`,
-          memberCount: signingQueue?.length ?? 0,
-          href: ROUTES.groups,
-        },
-        {
-          id: 'program',
-          name: batch?.programs.name ?? 'Class circle',
-          memberCount: onlineBatch?.length ?? 0,
-          href: ROUTES.groups,
-        },
-      ]
+  // No synthetic fallback cards. v1 invented a "batch" and a "program" group
+  // here when the student had none, with member counts taken from unrelated
+  // queries, both linking to /groups — which migration 004 emptied. Two doors
+  // to an empty room is the exact dropoff doc 07 was written to fix, so an
+  // empty list now renders an honest empty state instead.
+  const displayGroups = groups
 
   // Hero sticker notes — pull from the live `shirt_social_notes` set, fall
   // back to a hand-written welcome trio when the shirt has no notes yet so
@@ -283,7 +269,9 @@ export default async function DashboardPage() {
     : fallbackHeroNotes
   const heroNotes = heroNoteSource.slice(0, DEFAULT_HERO_NOTE_SLOTS.length)
 
-  const pendingCount = pendingRequestCount ?? 0
+  // One queue, one number. pproval mode is the only thing that ever puts
+  // anything here, and an open shirt never asks the owner to do anything.
+  const pendingApprovalCount = (pendingApprovals ?? []).length
   const queue = (signingQueue ?? []).slice(0, 4)
 
   // Whiteboard countdown copy — handles null deadline + 0-day edge cases
@@ -494,7 +482,7 @@ export default async function DashboardPage() {
             </div>
             <div>
               <dt className="text-eyebrow-uppercase">Pending</dt>
-              <dd className="mt-1 text-2xl font-display font-semibold text-ink-900">{pendingCount}</dd>
+              <dd className="mt-1 text-2xl font-display font-semibold text-ink-900">{pendingApprovalCount}</dd>
               <Link
                 href={ROUTES.profile(user.id)}
                 className="text-xs font-semibold text-brand transition hover:text-brand-hover"
@@ -577,8 +565,8 @@ export default async function DashboardPage() {
             <div>
               <h2 id="dash-upnext" className="text-eyebrow-display">Up next</h2>
               <p className="mt-1 text-xs text-ink-500">
-                {pendingCount > 0
-                  ? `${pendingCount} waiting to scribble · classmates below`
+                {pendingApprovalCount > 0
+                  ? `${pendingApprovalCount} waiting on you · classmates below`
                   : 'Classmates waiting for your mark.'}
               </p>
             </div>
@@ -587,43 +575,30 @@ export default async function DashboardPage() {
             </Link>
           </header>
 
-          {(pendingRequests?.length ?? 0) > 0 && (
+          {/* ── Approval queue ─────────────────────────────────────
+              Replaces "Pending requests". Under the one-door model nobody asks
+              permission to draw, so there is no queue of people waiting to be
+              let in — only a queue of drawings waiting to be revealed. The
+              decision is about one scribble, never about a person's access, and
+              a decline names nobody. */}
+          {pendingApprovalCount > 0 && (
             <div className="mb-6">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="inline-flex items-center gap-1.5 text-eyebrow-uppercase">
                   <Inbox size={12} className="text-brand" aria-hidden="true" />
-                  Pending requests
+                  Waiting on you
                 </p>
                 <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-bold text-brand">
-                  {pendingCount}
+                  {pendingApprovalCount}
                 </span>
               </div>
 
-              <div className="space-y-2">
-                {pendingRequests!.map(request => {
-                  const requester = pendingRequesterMap[request.requester_id]
-                  const requesterName = requester?.display_name ?? 'Someone'
+              <p className="mb-3 text-xs text-ink-500">
+                These are drawn and only you and the person who drew them can see them.
+                Post the ones you want on the shirt.
+              </p>
 
-                  return (
-                    <div
-                      key={request.id}
-                      className="flex items-center gap-3 rounded-2xl border border-[color:var(--line-soft)] bg-white/85 p-3 backdrop-blur-sm"
-                      style={{ borderRadius: '14px 16px 13px 15px' }}
-                    >
-                      <Avatar
-                        row={requester ?? null}
-                        displayName={requesterName}
-                        size="sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink-900">{requesterName}</p>
-                        <p className="text-xs text-ink-500">Wants to scribble</p>
-                      </div>
-                      <ScribbleRequestActions requestId={request.id} requesterName={requesterName} />
-                    </div>
-                  )
-                })}
-              </div>
+              <ApprovalInbox items={(pendingApprovals ?? []) as unknown as ApprovalItem[]} />
             </div>
           )}
 

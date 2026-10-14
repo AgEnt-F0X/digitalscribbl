@@ -46,7 +46,6 @@ export async function POST() {
       email: user.email,
       display_name: user.user_metadata?.full_name ?? user.email.split('@')[0],
       onboarding_completed: !isUniversity,
-      shirt_permission: isUniversity ? 'open' : 'locked',
       is_university_verified: isUniversity,
       is_guest: !isUniversity,
     })
@@ -65,19 +64,12 @@ export async function POST() {
   }
 
   if (existing.is_university_verified !== isUniversity || existing.is_guest !== !isUniversity) {
-    const updates: {
-      is_university_verified: boolean
-      is_guest: boolean
-      shirt_permission?: string
-    } = {
-      is_university_verified: isUniversity,
-      is_guest: !isUniversity,
-    }
-    if (!isUniversity) updates.shirt_permission = 'locked'
-
+    // No permission to reconcile. Under the one-door model a shirt's access mode
+    // belongs to the shirt and defaults to 'open', so signing in never has to
+    // lock or unlock anything.
     await db
       .from('users')
-      .update(updates)
+      .update({ is_university_verified: isUniversity, is_guest: !isUniversity })
       .eq('id', user.id)
   }
 

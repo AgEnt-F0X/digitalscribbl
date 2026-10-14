@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requirePageUser } from '@/lib/auth/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import Avatar from '@/components/avatar/Avatar'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import BottomNav from '@/components/nav/BottomNav'
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('display_name, yearbook_quote, thank_you_message, shirt_permission, body_style, shirt_color, head_front_url, head_back_url, avatar_config')
+    .select('display_name, yearbook_quote, thank_you_message, body_style, shirt_color, head_front_url, head_back_url, avatar_config')
     .eq('id', user.id)
     .single()
 
@@ -24,11 +25,40 @@ export default async function SettingsPage() {
 
   const { data: shirt } = await supabase
     .from('shirts')
-    .select('id, shirt_number, is_locked')
+    .select('id, shirt_number, is_locked, visibility')
     .eq('owner_id', user.id)
     .order('shirt_number', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  // The circle and block lists are read with the service role: RLS only lets a
+  // member confirm her own membership, because a policy of `using (true)` here
+  // would leak every circle's guest list to any authenticated user.
+  let circle: { user_id: string; display_name: string }[] = []
+  let blocked: { blocked_id: string; display_name: string }[] = []
+
+  if (shirt) {
+    const serviceDb = await createServiceClient()
+
+    const [{ data: circleRows }, { data: blockRows }] = await Promise.all([
+      serviceDb.from('shirt_circle').select('user_id').eq('shirt_id', shirt.id),
+      serviceDb.from('shirt_blocks').select('blocked_id').eq('shirt_id', shirt.id),
+    ])
+
+    const circleIds = (circleRows ?? []).map(r => r.user_id)
+    const blockIds = (blockRows ?? []).map(r => r.blocked_id)
+
+    if (circleIds.length || blockIds.length) {
+      const { data: people } = await serviceDb
+        .from('users')
+        .select('id, display_name')
+        .in('id', [...circleIds, ...blockIds])
+
+      const nameMap = new Map((people ?? []).map(p => [p.id, p.display_name]))
+      circle = circleIds.map(id => ({ user_id: id, display_name: nameMap.get(id) ?? 'Someone' }))
+      blocked = blockIds.map(id => ({ blocked_id: id, display_name: nameMap.get(id) ?? 'Someone' }))
+    }
+  }
 
   return (
     <div className="scribbl-page min-h-screen pb-24 md:pb-0">
@@ -78,11 +108,13 @@ export default async function SettingsPage() {
               display_name:     profile.display_name,
               yearbook_quote:   profile.yearbook_quote,
               thank_you_message: profile.thank_you_message,
-              shirt_permission: profile.shirt_permission,
               body_style:       profile.body_style,
               shirt_color:      profile.shirt_color,
               shirt_id:         shirt?.id ?? null,
               shirt_locked:     shirt?.is_locked ?? false,
+              shirt_visibility: shirt?.visibility ?? 'open',
+              circle,
+              blocked,
             }}
           />
         </section>

@@ -3,30 +3,24 @@
 import { useState, useTransition } from 'react'
 import { BODY_STYLES, SHIRT_COLORS } from '@/lib/constants'
 import Avatar from '@/components/avatar/Avatar'
-import type { ShirtPermission } from '@/lib/supabase/types'
+import ShirtAccessPanel from './ShirtAccessPanel'
+import type { ShirtVisibility } from '@/lib/identity/signing'
 
 interface Props {
   initial: {
     display_name:     string
     yearbook_quote:   string | null
     thank_you_message: string | null
-    shirt_permission: string
     body_style:       string
     shirt_color:      string
     shirt_id:         string | null
     shirt_locked:     boolean
+    /** The primary shirt's access mode — `open` unless the owner changed it. */
+    shirt_visibility: string | null
+    circle:           { user_id: string; display_name: string }[]
+    blocked:          { blocked_id: string; display_name: string }[]
   }
 }
-
-// V1 surface area is two modes (doc 16 synthesis): the safe default
-// `batch_only` and the opt-in stricter `request_only`. The legacy `open`
-// and `locked` values still validate at the API so anyone with that value
-// from before keeps working — they just can't pick it again here.
-// "Locked" is exposed as the Pause-signing toggle further down.
-const PERMISSION_OPTIONS: { value: ShirtPermission; label: string; desc: string; emoji: string }[] = [
-  { value: 'batch_only',   label: 'Batchmates',   emoji: '🎓', desc: 'Only people from your B.Tech CS batch can sign — the v1 default.' },
-  { value: 'request_only', label: 'Request only', emoji: '✉️',  desc: 'Approve each person manually before they can sign.' },
-]
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
@@ -41,7 +35,6 @@ export default function ProfileForm({ initial }: Props) {
   const [displayName,     setDisplayName]     = useState(initial.display_name)
   const [yearbookQuote,   setYearbookQuote]   = useState(initial.yearbook_quote ?? '')
   const [thankYouMessage, setThankYouMessage] = useState(initial.thank_you_message ?? '')
-  const [permission,      setPermission]      = useState(initial.shirt_permission)
   const [bodyStyle,       setBodyStyle]       = useState(initial.body_style)
   const [shirtColor,      setShirtColor]      = useState(initial.shirt_color)
   const [shirtLocked,     setShirtLocked]     = useState(initial.shirt_locked)
@@ -140,39 +133,18 @@ export default function ProfileForm({ initial }: Props) {
         </div>
       </section>
 
-      {/* ── Privacy ─────────────────────────────────────────── */}
-      <section className="card p-6">
-        <h2 className="text-base font-semibold text-ink-900 mb-1">Shirt privacy</h2>
-        <p className="text-xs text-gray-400 mb-5">Control who can leave scribbles on your shirt</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PERMISSION_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setPermission(opt.value)}
-              className={`text-left p-4 rounded-xl border-2 transition-all ${
-                permission === opt.value
-                  ? 'border-ink-900 bg-ink-900 text-white'
-                  : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700'
-              }`}
-            >
-              <span className="text-xl">{opt.emoji}</span>
-              <p className={`font-semibold text-sm mt-1 ${permission === opt.value ? 'text-white' : 'text-ink-900'}`}>
-                {opt.label}
-              </p>
-              <p className={`text-xs mt-0.5 ${permission === opt.value ? 'text-white/70' : 'text-gray-400'}`}>
-                {opt.desc}
-              </p>
-            </button>
-          ))}
-        </div>
-        <button
-          disabled={isPending}
-          onClick={() => startTransition(() => save({ shirt_permission: permission }))}
-          className="btn-primary text-sm mt-4"
-        >
-          {isPending ? 'Saving…' : 'Save privacy'}
-        </button>
-      </section>
+      {/* ── Who can sign ─────────────────────────────────────── */}
+      {/* Replaces the v1 two-option "Shirt privacy" radio pair. Doc 07: the
+          access mode belongs to the SHIRT, not to the profile, so it is edited
+          per shirt and the default needs no configuration. */}
+      {initial.shirt_id && (
+        <ShirtAccessPanel
+          shirtId={initial.shirt_id}
+          initialVisibility={(initial.shirt_visibility as ShirtVisibility) ?? 'open'}
+          circle={initial.circle}
+          blocked={initial.blocked}
+        />
+      )}
 
       {/* ── Avatar ──────────────────────────────────────────── */}
       <section className="card p-6">
