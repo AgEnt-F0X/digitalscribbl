@@ -4,11 +4,7 @@
 export const SHIRT_W = 400
 export const SHIRT_H = 600
 
-// Shirt panels dimensions (all same size for simplicity)
-export const PANEL_AREA = SHIRT_W * SHIRT_H  // 240 000 px²
-
 // ── Bounding Box ─────────────────────────────────────────────
-export const BOX_DEFAULT_SIZE = 140
 export const BOX_MIN_SIZE = 40
 export const BOX_MAX_SIZE = 300
 
@@ -17,11 +13,7 @@ export const THROTTLE_BOX_MS    = 60   // ghost box position broadcast
 export const THROTTLE_STROKE_MS = 50   // stroke broadcast
 
 // ── Shirt Occupancy ───────────────────────────────────────────
-export const OCCUPANCY_WARNING_THRESHOLD = 90   // % — show "almost full" to new scribblers
 export const OCCUPANCY_FULL_THRESHOLD    = 100  // % — unlock next shirt
-
-// ── Box Claim ────────────────────────────────────────────────
-export const BOX_CLAIM_TTL_MINUTES = 10  // matches DB default + Edge Function cron
 
 // ── Head Images ──────────────────────────────────────────────
 export const HEAD_MAX_DIMENSION = 512   // px — resize on upload

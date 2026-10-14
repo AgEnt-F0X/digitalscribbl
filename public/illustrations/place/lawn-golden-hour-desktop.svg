@@ -1,61 +1,88 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched campus lawn at golden hour (desktop placeholder)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Campus lawn at golden hour — warm sky, layered trees, and a park bench under the setting sun">
   <defs>
     <linearGradient id="sky-d" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe6b3"/>
-      <stop offset="55%" stop-color="#fbd498"/>
-      <stop offset="100%" stop-color="#f4ba79"/>
+      <stop offset="0%" stop-color="#fcd9a8"/>
+      <stop offset="35%" stop-color="#fcce8a"/>
+      <stop offset="65%" stop-color="#f5b56e"/>
+      <stop offset="100%" stop-color="#e8955a"/>
     </linearGradient>
-    <radialGradient id="sun-d" cx="0.78" cy="0.22" r="0.32">
-      <stop offset="0%" stop-color="#fff3d1" stop-opacity="0.95"/>
-      <stop offset="50%" stop-color="#ffdca0" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#fbd498" stop-opacity="0"/>
+    <radialGradient id="sun-glow" cx="0.76" cy="0.18" r="0.42">
+      <stop offset="0%" stop-color="#fff8e1" stop-opacity="0.98"/>
+      <stop offset="25%" stop-color="#ffe8b0" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#ffd696" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#fcd9a8" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="lawn-d" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#b9c277"/>
-      <stop offset="100%" stop-color="#86934f"/>
+      <stop offset="0%" stop-color="#c4cd7a"/>
+      <stop offset="45%" stop-color="#a8b45e"/>
+      <stop offset="100%" stop-color="#7d8a47"/>
     </linearGradient>
+    <linearGradient id="lawn-shade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3d2e14" stop-opacity="0.08"/>
+      <stop offset="50%" stop-color="#3d2e14" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#3d2e14" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="trunk-d" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a3520"/>
+      <stop offset="50%" stop-color="#5c452a"/>
+      <stop offset="100%" stop-color="#3d2e14"/>
+    </linearGradient>
+    <radialGradient id="foliage-dark" cx="0.5" cy="0.4" r="0.5">
+      <stop offset="0%" stop-color="#7a8f4a"/>
+      <stop offset="60%" stop-color="#5a6e32"/>
+      <stop offset="100%" stop-color="#3d4f22"/>
+    </radialGradient>
+    <radialGradient id="foliage-light" cx="0.45" cy="0.35" r="0.55">
+      <stop offset="0%" stop-color="#9fb858"/>
+      <stop offset="50%" stop-color="#7a9645"/>
+      <stop offset="100%" stop-color="#5a7430"/>
+    </radialGradient>
   </defs>
   <rect width="1920" height="1080" fill="url(#sky-d)"/>
-  <rect width="1920" height="1080" fill="url(#sun-d)"/>
-  <path d="M0 720 C 480 660 980 700 1450 660 C 1640 645 1820 660 1920 670 L 1920 1080 L 0 1080 Z" fill="url(#lawn-d)"/>
-  <path d="M0 720 C 480 660 980 700 1450 660 C 1640 645 1820 660 1920 670" fill="none" stroke="#5e6a36" stroke-width="2.5" opacity="0.55" stroke-linecap="round"/>
-  <g opacity="0.45" stroke="#5e6a36" stroke-width="2" stroke-linecap="round">
-    <path d="M120 820 l4 -16"/>
-    <path d="M180 880 l4 -16"/>
-    <path d="M240 800 l4 -16"/>
-    <path d="M300 860 l4 -16"/>
-    <path d="M400 900 l4 -16"/>
-    <path d="M520 820 l4 -16"/>
-    <path d="M640 880 l4 -16"/>
-    <path d="M760 800 l4 -16"/>
-    <path d="M880 860 l4 -16"/>
-    <path d="M1000 920 l4 -16"/>
-    <path d="M1120 820 l4 -16"/>
-    <path d="M1260 880 l4 -16"/>
-    <path d="M1400 800 l4 -16"/>
-    <path d="M1540 860 l4 -16"/>
-    <path d="M1680 820 l4 -16"/>
-    <path d="M1820 880 l4 -16"/>
+  <rect width="1920" height="1080" fill="url(#sun-glow)"/>
+  <circle cx="1490" cy="200" r="48" fill="#fff8e1" opacity="0.92"/>
+  <circle cx="1490" cy="200" r="38" fill="#fffceb"/>
+  <g fill="none" stroke="#e8955a" stroke-width="1.5" opacity="0.18">
+    <path d="M1490 130 v-20 M1490 270 v20 M1420 200 h-20 M1560 200 h20 M1440 150 l-14 -14 M1540 250 l14 14 M1540 150 l14 -14 M1440 250 l-14 14"/>
+  </g>
+  <path d="M0 660 C 320 610 580 640 960 620 C 1260 605 1580 630 1920 610" fill="none" stroke="#5e6a36" stroke-width="2" opacity="0.5" stroke-linecap="round"/>
+  <path d="M0 660 C 320 610 580 640 960 620 C 1260 605 1580 630 1920 610 L 1920 1080 L 0 1080 Z" fill="url(#lawn-d)"/>
+  <rect x="0" y="660" width="1920" height="420" fill="url(#lawn-shade)" opacity="0.3"/>
+  <g fill="none" stroke="#5e6a36" stroke-width="1.5" opacity="0.28" stroke-linecap="round">
+    <path d="M60 750 q 4 -12 8 -6 M180 820 q 3 -10 6 -4 M320 710 q 5 -14 10 -8 M460 860 q 3 -10 6 -4 M580 740 q 4 -12 8 -6 M720 830 q 3 -10 6 -4 M880 720 q 5 -14 10 -8 M1040 850 q 3 -10 6 -4 M1200 760 q 4 -12 8 -6 M1360 840 q 3 -10 6 -4 M1520 730 q 4 -12 8 -6 M1680 820 q 3 -10 6 -4 M1820 710 q 5 -14 10 -8"/>
+  </g>
+  <g opacity="0.6">
+    <path d="M1380 660 v-20 l12 -8 l12 8 v20" fill="#8aa15c" stroke="#5e6a36" stroke-width="1.5"/>
+    <path d="M1380 640 l-6 -6" fill="none" stroke="#5e6a36" stroke-width="1.5" stroke-linecap="round"/>
   </g>
   <g opacity="0.55">
-    <ellipse cx="1380" cy="600" rx="160" ry="120" fill="#8aa15c"/>
-    <ellipse cx="1320" cy="560" rx="120" ry="90" fill="#9bb16c"/>
-    <ellipse cx="1450" cy="570" rx="110" ry="80" fill="#7e9355"/>
-    <path d="M1380 720 v-90" stroke="#5b4524" stroke-width="14" stroke-linecap="round"/>
-    <path d="M1370 660 c -8 14 -10 36 0 56" stroke="#5b4524" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <ellipse cx="1370" cy="560" rx="170" ry="130" fill="url(#foliage-light)"/>
+    <ellipse cx="1290" cy="510" rx="130" ry="100" fill="url(#foliage-dark)"/>
+    <ellipse cx="1460" cy="530" rx="120" ry="90" fill="url(#foliage-dark)"/>
+    <path d="M1320 520 c 20 -14 50 -18 80 -10" fill="none" stroke="#9fb858" stroke-width="2" opacity="0.5"/>
+    <path d="M1370 660 v-94" stroke="url(#trunk-d)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M1356 590 c -10 18 -12 44 0 70" fill="none" stroke="#5b4524" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1392 610 c 8 14 10 36 0 56" fill="none" stroke="#5b4524" stroke-width="4" stroke-linecap="round"/>
   </g>
   <g opacity="0.35">
-    <ellipse cx="320" cy="640" rx="110" ry="80" fill="#a3b56a"/>
-    <ellipse cx="360" cy="610" rx="80" ry="60" fill="#b6c277"/>
-    <path d="M340 720 v-70" stroke="#5b4524" stroke-width="10" stroke-linecap="round"/>
+    <ellipse cx="320" cy="590" rx="120" ry="90" fill="url(#foliage-light)"/>
+    <ellipse cx="360" cy="560" rx="90" ry="70" fill="url(#foliage-dark)"/>
+    <path d="M340 660 v-76" stroke="url(#trunk-d)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M332 610 c -8 12 -10 32 0 50" fill="none" stroke="#5b4524" stroke-width="4" stroke-linecap="round"/>
   </g>
-  <g opacity="0.25" stroke="#7a6238" stroke-width="3" fill="none">
-    <path d="M820 650 c 30 -20 80 -22 130 0 c 50 22 110 18 150 -2" stroke-linecap="round"/>
-    <path d="M860 670 c 40 -8 90 -8 140 4" stroke-linecap="round"/>
+  <g opacity="0.3">
+    <ellipse cx="560" cy="600" rx="70" ry="50" fill="url(#foliage-light)"/>
+    <path d="M560 660 v-54" stroke="url(#trunk-d)" stroke-width="8" stroke-linecap="round"/>
   </g>
-  <g opacity="0.18" stroke="#3D2E14" stroke-width="1.5" fill="none">
-    <path d="M520 720 L 540 760 L 560 720" stroke-linecap="round"/>
-    <path d="M620 740 L 640 780 L 660 740" stroke-linecap="round"/>
-    <path d="M1080 730 L 1100 770 L 1120 730" stroke-linecap="round"/>
+  <g opacity="0.22">
+    <ellipse cx="1720" cy="620" rx="60" ry="42" fill="url(#foliage-dark)"/>
+    <path d="M1720 660 v-38" stroke="url(#trunk-d)" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <path d="M0 1080 L 1920 1080" stroke="#5e6a36" stroke-width="1.5" opacity="0.15"/>
+  <g opacity="0.15" stroke="#3d2e14" stroke-width="1.2" fill="none" stroke-linecap="round">
+    <path d="M440 730 l14 -24 l14 24 M1440 740 l14 -24 l14 24 M940 760 l14 -24 l14 24"/>
+  </g>
+  <g opacity="0.12" fill="none" stroke="#2d2923" stroke-width="1">
+    <path d="M160 690 q 40 -20 80 0 M480 700 q 30 -18 60 0 M1160 680 q 50 -22 100 0"/>
   </g>
 </svg>

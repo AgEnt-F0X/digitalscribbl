@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scribbl — before (Sunlit Lawn as shipped)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Inter:wght@400..700&family=Permanent+Marker&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.css">
+<style>
+  /* Current tokens, from tailwind.config.ts / globals.css (Sunlit Lawn as shipped) */
+  :root {
+    --paper-50: #FFFDF7; --paper-100: #FFF6D9; --paper-200: #FFF0C2; --paper-300: #F4EAD8;
+    --ink-900: #1A1208; --ink-700: #3D2E14; --ink-500: #6B4E1E; --ink-300: #A07040;
+    --brand: #6f54df; --brand-soft: #ECE8FB;
+    --wb: #F8F8F2; --wb-frame: #cfd5da; --wb-edge: #9ba2aa;
+    --marker-blue: #2563EB; --marker-red: #D83F6B; --marker-green: #5F8B48;
+    --font-display: "Caveat", cursive;
+    --font-hand: "Caveat", cursive;   /* as shipped: Patrick Hand mapped to Caveat fallback */
+    --font-marker: "Permanent Marker", cursive;
+    --font-body: "Inter", sans-serif;
+  }
+  .screen { font-family: var(--font-body); }
+
+  /* .scribbl-page: cream + faint grid + white radial glows (as shipped) */
+  .page {
+    position: absolute; inset: 0; background: var(--paper-100); overflow: hidden;
+    background-image: radial-gradient(circle at 18% 12%, rgba(255,255,255,.9), transparent 42%),
+                      radial-gradient(circle at 85% 70%, rgba(255,255,255,.7), transparent 40%);
+  }
+  .page::before { /* dotted grid */
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(111,84,223,.10) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+  }
+  .place { /* ambient place layer as shipped: 10% + 3px blur, mix-blend multiply */
+    position: absolute; inset: 0; opacity: .12; filter: blur(3px); mix-blend-mode: multiply;
+  }
+  .content { position: absolute; inset: 0; overflow: hidden; }
+
+  /* sticky page nav as shipped */
+  .pnav {
+    position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    background: rgba(255,246,217,.88); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(160,112,64,.14);
+  }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 24px; color: var(--ink-900); position: relative; }
+  .wordmark svg { position: absolute; left: 2px; bottom: -6px; width: 74px; }
+  .pnav-right { display: flex; align-items: center; gap: 12px; }
+  .bell { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--ink-700); }
+  .avatar-dot { width: 34px; height: 34px; border-radius: 50%; background: #E8B98A; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(45,35,22,.25); display: grid; place-items: center; font-weight: 700; color: #7A4A21; font-size: 13px; }
+
+  .scroll { position: absolute; inset: 0; overflow: hidden; padding: 64px 16px 150px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* hero cluster as shipped */
+  .hero { position: relative; padding: 10px 4px 2px; }
+  .halo { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); width: 148px; height: 148px; border-radius: 50%;
+          border: 1.5px dashed rgba(111,84,223,.5); animation: none; }
+  .avatar { width: 116px; height: 116px; border-radius: 50%; margin: 20px auto 0; background: #E8B98A;
+            border: 3px solid #fff; box-shadow: 0 4px 14px rgba(45,35,22,.28); display: grid; place-items: center;
+            font-family: var(--font-display); font-size: 44px; color: #6E3F1B; }
+  .note { position: absolute; width: 108px; border-radius: 4px 8px 6px 4px; padding: 7px 8px 8px;
+          font-family: var(--font-hand); font-size: 13.5px; line-height: 1.15; color: var(--ink-700);
+          box-shadow: 0 3px 8px rgba(45,35,22,.22); }
+  .note b { display: block; font-size: 11px; font-family: var(--font-body); font-weight: 600; margin-top: 3px; color: var(--ink-500); }
+  .n1 { left: 2px;  top: 26px;  background: #ffe6ef; transform: rotate(-8deg); }
+  .n2 { right: 0;   top: 8px;   background: #e9f7df; transform: rotate(7deg); }
+  .n3 { left: 8px;  top: 168px; background: #edf4ff; transform: rotate(5deg); display: none; } /* shipped: hidden md:block */
+  .n4 { right: 4px; top: 178px; background: #fff3bf; transform: rotate(-6deg); display: none; }
+  .who { text-align: center; margin-top: 12px; }
+  .who h1 { font-family: var(--font-display); font-size: 52px; line-height: 1; color: var(--ink-900); transform: rotate(-1deg); margin: 0; font-weight: 700; }
+  .who p { margin: 4px 0 0; font-size: 13px; color: var(--ink-500); }
+
+  /* whiteboard, wall-mounted small (as shipped) */
+  .wb { margin: 4px auto 0; width: 250px; background: var(--wb); border: 5px solid var(--wb-frame);
+        outline: 1px solid var(--wb-edge); border-radius: 4px; padding: 10px 12px 12px; position: relative;
+        box-shadow: 0 3px 8px rgba(45,35,22,.18); transform: rotate(-.6deg); }
+  .wb::after { content: ""; position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%);
+               width: 34px; height: 22px; border-left: 3px solid var(--wb-edge); border-right: 3px solid var(--wb-edge); }
+  .wb .marker { font-family: var(--font-marker); font-size: 15px; color: var(--marker-blue); line-height: 1.15; }
+  .wb .sub { font-family: var(--font-hand); font-size: 13px; color: var(--ink-700); margin-top: 2px; }
+
+  .cta-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+  .btn-primary { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: #fff;
+    background: var(--brand); border-radius: 16px 15px 17px 14px; padding: 10px 22px; border: none;
+    box-shadow: 0 3px 10px rgba(111,84,223,.35); }
+  .btn-ghost { font-family: var(--font-body); font-size: 13.5px; font-weight: 600; color: var(--ink-700);
+    background: rgba(255,255,255,.8); border: 1.5px solid var(--paper-300); border-radius: 14px; padding: 10px 14px; }
+
+  /* sketch-panel shirt card as shipped */
+  .panel { background: rgba(255,253,247,.92); border: 1.5px solid var(--paper-300); border-radius: 16px 17px 14px 18px;
+           box-shadow: 0 4px 12px rgba(45,35,22,.12); padding: 12px 12px 14px; }
+  .panel-tabs { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .segtab { display: flex; gap: 4px; }
+  .segtab span { font-size: 12.5px; font-weight: 600; color: var(--ink-500); padding: 5px 12px; border-radius: 9px 10px 8px 11px; }
+  .segtab span.on { background: var(--brand-soft); color: #4A34B8; }
+  .fillpill { font-size: 11px; font-weight: 700; color: #4A34B8; background: var(--brand-soft); border-radius: 999px; padding: 4px 10px; }
+  .shirt-wrap { display: grid; place-items: center; padding: 4px 0 2px; }
+  .occ { margin-top: 8px; display: grid; gap: 6px; }
+  .occ .row { display: grid; grid-template-columns: 58px 1fr 36px; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-500); }
+  .bar { height: 6px; border-radius: 999px; background: var(--paper-200); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+
+  /* bottom nav as shipped (56px, white/95, center purple FAB) */
+  .bnav { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; z-index: 30;
+          background: rgba(255,255,255,.95); backdrop-filter: blur(8px); border-top: 1px solid rgba(160,112,64,.16);
+          display: grid; grid-template-columns: 1fr 1fr 76px 1fr 1fr; align-items: center; padding: 0 8px; }
+  .bnav .item { display: grid; justify-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--ink-500); }
+  .bnav .item.on { color: #4A34B8; }
+  .fab { width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center;
+         margin: -26px auto 0; box-shadow: 0 6px 16px rgba(111,84,223,.45); border: 3px solid #fff; }
+</style>
+</head>
+<body>
+
+<section class="screen" data-name="before-profile" data-chrome="none">
+  <div class="page">
+    <div class="place">
+      <svg viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+        <rect width="390" height="844" fill="#E8C77C"/>
+        <ellipse cx="80" cy="120" rx="90" ry="60" fill="#9CB86A"/>
+        <ellipse cx="330" cy="90" rx="100" ry="70" fill="#B5C97E"/>
+        <ellipse cx="60" cy="700" rx="120" ry="90" fill="#A9BF72"/>
+        <rect y="360" width="390" height="60" fill="#D9B36A"/>
+      </svg>
+    </div>
+    <div class="content">
+      <div class="pnav">
+        <div class="wordmark">scribbl
+          <svg viewBox="0 0 74 10" fill="none"><path d="M2 6 C14 1, 26 9, 38 5 S 62 3, 72 6" stroke="#6f54df" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="pnav-right">
+          <div class="bell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+          <div class="avatar-dot">IB</div>
+        </div>
+      </div>
+
+      <div class="scroll" data-scrolls>
+        <div class="hero">
+          <div class="halo"></div>
+          <div class="avatar">IB</div>
+          <div class="note n1">still owe you for the DX lab<b>— Kabir</b></div>
+          <div class="note n2">frontend queen, never change<b>— Meghna</b></div>
+          <div class="note n3">who will finish your sentences now<b>— Arjun</b></div>
+          <div class="note n4">lab partner for life<b>— Priya</b></div>
+          <div class="who">
+            <h1>Ishita Bansal</h1>
+            <p>B.Tech CSE · Class of 2026 · shirt 1 of 2</p>
+          </div>
+          <div class="wb">
+            <div class="marker">SIGNED BY 17 FRIENDS</div>
+            <div class="sub">23 marks · 2 patches free on the back</div>
+          </div>
+          <div class="cta-row">
+            <button class="btn-primary">Sign this shirt</button>
+            <button class="btn-ghost">Share her link</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-tabs">
+            <div class="segtab"><span class="on">Front</span><span>Back</span></div>
+            <div class="fillpill">62% filled</div>
+          </div>
+          <div class="shirt-wrap">
+            <svg width="230" height="330" viewBox="0 0 400 600">
+              <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L286 180 L286 526 C286 536 278 544 268 544 L132 544 C122 544 114 536 114 526 L114 180 L90 194 L64 130 C58 116 64 102 78 96 Z"
+                    fill="#F8F8F8" stroke="#D6CDBE" stroke-width="3"/>
+              <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#D6CDBE" stroke-width="3"/>
+              <!-- older marks, faded -->
+              <g opacity=".45" font-family="Caveat" font-size="30">
+                <text x="150" y="352" fill="#6B4E1E" transform="rotate(-4 150 352)">2026</text>
+                <text x="180" y="420" fill="#6B4E1E" transform="rotate(3 180 420)">IRONY</text>
+                <text x="130" y="480" fill="#6B4E1E" transform="rotate(-2 130 480)">R.</text>
+                <text x="216" y="392" fill="#6B4E1E" transform="rotate(6 216 392)">T</text>
+              </g>
+              <path d="M150 210 C168 196 196 212 208 234" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round"/>
+              <path d="M208 234 l-10 -7 M208 234 l-13 1" stroke="#2563EB" stroke-width="5" stroke-linecap="round"/>
+              <path d="M244 216 c-8 -10 -24 -2 -18 10 c4 9 18 12 18 12 c0 0 14 -3 18 -12 c6 -12 -10 -20 -18 -10" fill="none" stroke="#D83F6B" stroke-width="4" stroke-linecap="round"/>
+              <text x="136" y="286" font-family="Caveat" font-size="34" fill="#5F8B48" transform="rotate(-3 136 286)">bon voyage</text>
+            </svg>
+          </div>
+          <div class="occ">
+            <div class="row"><span>collar</span><div class="bar"><i style="width:40%"></i></div><span>4</span></div>
+            <div class="row"><span>body</span><div class="bar"><i style="width:62%"></i></div><span>15</span></div>
+            <div class="row"><span>hem</span><div class="bar"><i style="width:34%"></i></div><span>4</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bnav" data-float>
+        <div class="item"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Home</div>
+        <div class="item"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>Explore</div>
+        <div class="fab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L20 6.5 17.5 4 5 16.5 4 20z"/></svg></div>
+        <div class="item"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Activity</div>
+        <div class="item on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>Profile</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.js"></script>
+</body>
+</html>

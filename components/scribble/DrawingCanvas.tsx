@@ -36,6 +36,13 @@ export interface DrawingCanvasRef {
   redo(): void
   clear(): void
   /**
+   * Abort the stroke/shape currently being drawn (e.g. when a second finger
+   * lands and the gesture becomes pan/pinch). Freehand drawing stays
+   * suspended until `resumeDrawing()` is called after the gesture ends.
+   */
+  cancelActiveStroke(): void
+  resumeDrawing(): void
+  /**
    * Re-style every text-like object on the canvas with the supplied props.
    * Used by Signature mode so the user can flip font / colour / size in the
    * side panel and see the canvas update live without re-typing.
@@ -82,6 +89,16 @@ type FabricRect = { left: number; top: number; width: number; height: number }
 const FONT_SIZE_MAP = { sm: 14, md: 20, lg: 28 }
 const MIN_SHAPE_DRAG = 3
 const LAYER_PADDING = 10
+
+// Small hand-drawn eraser glyph used as the eraser-tool cursor. The previous
+// `not-allowed` cursor read as "this action is disabled".
+const ERASER_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">'
+  + '<g transform="rotate(-30 12 12)">'
+  + '<rect x="4" y="8" width="16" height="9" rx="2.5" fill="white" stroke="black" stroke-width="1.6"/>'
+  + '<rect x="4" y="8" width="7" height="9" rx="2.5" fill="black" opacity="0.85"/>'
+  + '</g></svg>',
+)}") 12 12, cell`
 
 function applyClipPath(canvas: FabricCanvas, mod: FabricModule, clipPath?: string) {
   const clippedCanvas = canvas as FabricCanvas & { clipPath?: FabricObject }
@@ -205,10 +222,19 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
   const hostRef = useRef<HTMLDivElement>(null)
   const fabricRef = useRef<FabricCanvas | null>(null)
   const fabricMod = useRef<FabricModule | null>(null)
+  // `initialJson` is mount-time-only: consumers remount via `key` when they
+  // want a fresh load. Reading it through a ref keeps the (frequently
+  // re-created) draft object out of the init effect's dependencies, so a
+  // stroke commit no longer disposes and rebuilds the whole Fabric canvas.
+  const initialJsonRef = useRef(initialJson)
   const undoStack = useRef<string[]>([])
   const redoStack = useRef<string[]>([])
   const isPointerDown = useRef(false)
   const liveShape = useRef<{ kind: LiveShapeKind; object: FabricObject; start: Point } | null>(null)
+  // Set while a pan/pinch gesture has interrupted a freehand stroke: the
+  // next `path:created` (if Fabric still emits one) is discarded.
+  const suppressNextPath = useRef(false)
+  const originalStrokePropsRef = useRef<Map<any, { stroke: any; strokeWidth: any }>>(new Map())
 
   const colorRef = useRef(color)
   const opacityRef = useRef(opacity)
@@ -259,6 +285,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
     const target = event.target ?? fallbackTarget
     if (!target) return
 
+    originalStrokePropsRef.current.delete(target)
     canvas.remove(target)
     canvas.discardActiveObject()
     canvas.requestRenderAll()
@@ -274,6 +301,23 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
     import('fabric').then(mod => {
       if (!hostRef.current || disposed) return
 
+      // Touch-friendly selection chrome for text/sticker objects: bigger
+      // corner hit areas (especially `touchCornerSize`) and visible corners.
+      const objectDefaults = (mod as unknown as {
+        FabricObject?: { ownDefaults?: Record<string, unknown> }
+      }).FabricObject?.ownDefaults
+      if (objectDefaults) {
+        Object.assign(objectDefaults, {
+          cornerSize: 11,
+          touchCornerSize: 26,
+          transparentCorners: false,
+          cornerColor: '#ffffff',
+          cornerStrokeColor: '#2d2923',
+          borderColor: '#2d2923',
+          padding: 4,
+        })
+      }
+
       const canvasEl = document.createElement('canvas')
       canvasEl.width = w
       canvasEl.height = h
@@ -288,7 +332,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
         backgroundColor: undefined,
         selection: false,
         isDrawingMode: false,
-        enableRetinaScaling: false,
+        // Multiply the backing store by devicePixelRatio so strokes stay
+        // crisp on phones/retina displays. Coordinates and exports remain in
+        // the canonical 400×600 space — only render density changes.
+        enableRetinaScaling: true,
+        // Let taps land on thin strokes when selecting/erasing.
+        targetFindTolerance: 8,
       })
 
       canvas = liveCanvas
@@ -508,11 +557,47 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
         commitCanvas(liveCanvas)
       }
 
+      const handleMouseOver = (event: FabricEvent) => {
+        if (toolRef.current !== TOOL_ERASER) return
+        const obj = event.target
+        if (!obj) return
+        if (!originalStrokePropsRef.current.has(obj)) {
+          originalStrokePropsRef.current.set(obj, {
+            stroke: obj.stroke,
+            strokeWidth: obj.strokeWidth,
+          })
+          obj.set({
+            stroke: '#ef4444',
+            strokeWidth: Math.max(2, (obj.strokeWidth as number) || 0),
+          })
+          liveCanvas.requestRenderAll()
+        }
+      }
+
+      const handleMouseOut = (event: FabricEvent) => {
+        const obj = event.target
+        if (!obj) return
+        const orig = originalStrokePropsRef.current.get(obj)
+        if (orig) {
+          obj.set(orig)
+          originalStrokePropsRef.current.delete(obj)
+          liveCanvas.requestRenderAll()
+        }
+      }
+
       liveCanvas.on('mouse:down', handleMouseDown)
       liveCanvas.on('mouse:move', handleMouseMove)
       liveCanvas.on('mouse:up', handleMouseUp)
+      liveCanvas.on('mouse:over', handleMouseOver)
+      liveCanvas.on('mouse:out', handleMouseOut)
 
       liveCanvas.on('path:created', ({ path }) => {
+        if (suppressNextPath.current) {
+          suppressNextPath.current = false
+          liveCanvas.remove(path)
+          liveCanvas.requestRenderAll()
+          return
+        }
         const activeTool = toolRef.current
         // Mirror the brush's stroke styling onto the resulting Path so the
         // SVG export (which the rest of the app uses for compositing) shows
@@ -538,8 +623,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
         commitCanvas(liveCanvas)
       })
 
-      if (initialJson && hasDrawableFabricJson(initialJson)) {
-        void liveCanvas.loadFromJSON(initialJson).then(() => {
+      const mountJson = initialJsonRef.current
+      if (mountJson && hasDrawableFabricJson(mountJson)) {
+        void liveCanvas.loadFromJSON(mountJson).then(() => {
           liveCanvas.renderAll()
           pushSnapshot(liveCanvas)
           onStrokeRef.current(liveCanvas.toJSON())
@@ -570,12 +656,22 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       isPointerDown.current = false
       host.replaceChildren()
     }
-  }, [w, h, initialJson, onRemoteStroke, commitCanvas, eraseTarget, pushSnapshot, clipPath])
+  }, [w, h, onRemoteStroke, commitCanvas, eraseTarget, pushSnapshot, clipPath])
 
   useEffect(() => {
     const canvas = fabricRef.current
     const mod = fabricMod.current
     if (!canvas || !mod) return
+
+    if (tool !== TOOL_ERASER) {
+      originalStrokePropsRef.current.forEach((orig, obj) => {
+        try {
+          obj.set(orig)
+        } catch {}
+      })
+      originalStrokePropsRef.current.clear()
+      canvas.requestRenderAll()
+    }
 
     cancelLiveShape()
 
@@ -595,8 +691,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
     }
 
     if (tool === TOOL_ERASER) {
-      canvas.defaultCursor = 'not-allowed'
-      canvas.hoverCursor = 'not-allowed'
+      canvas.defaultCursor = ERASER_CURSOR
+      canvas.hoverCursor = ERASER_CURSOR
       setObjectInteractivity(canvas, false, true)
       canvas.renderAll()
       return
@@ -693,6 +789,20 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
         backgroundColor: undefined,
         enableRetinaScaling: false,
       })
+
+      // Carry the shirt clip into the cropped layer (shifted by the box
+      // origin) so edge strokes can't bleed outside the shirt outline when
+      // the saved SVG is re-rendered without a clipping container.
+      if (clipPath) {
+        const layerClip = new mod.Path(clipPath, {
+          left: -box.x,
+          top: -box.y,
+          selectable: false,
+          evented: false,
+          absolutePositioned: true,
+        } as ConstructorParameters<typeof mod.Path>[1]) as FabricObject
+        ;(layerCanvas as unknown as { clipPath?: FabricObject }).clipPath = layerClip
+      }
 
       for (const object of objects) {
         const cloned = await object.clone()
@@ -791,6 +901,29 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(function 
       canvas.discardActiveObject()
       canvas.renderAll()
       commitCanvas(canvas)
+    },
+    cancelActiveStroke: () => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+      cancelLiveShape()
+      if (canvas.isDrawingMode) {
+        // Suspend drawing so the gesture's remaining pointer events don't
+        // extend the stroke, and discard whatever the brush has rendered to
+        // the preview (top) context so far.
+        suppressNextPath.current = true
+        canvas.isDrawingMode = false
+        const topContext = (canvas as unknown as { contextTop?: CanvasRenderingContext2D }).contextTop
+        if (topContext) canvas.clearContext(topContext)
+        canvas.requestRenderAll()
+      }
+    },
+    resumeDrawing: () => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+      suppressNextPath.current = false
+      if (FREEHAND_BRUSHES.has(toolRef.current)) {
+        canvas.isDrawingMode = true
+      }
     },
     restyleAllText: (options) => {
       const canvas = fabricRef.current

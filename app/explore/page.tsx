@@ -110,7 +110,7 @@ export default async function ExplorePage({ searchParams }: Props) {
       <div className="relative z-10">
         <nav className="sticky top-0 z-30 border-b border-[color:var(--line-soft)] bg-paper-100/88 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <Link href="/dashboard" className="font-display font-bold text-xl text-ink-900">scribbl</Link>
+            <Link href="/dashboard" className="scribble-underline font-display text-3xl font-bold leading-none text-ink-900">Scribbl</Link>
             <div className="flex items-center gap-3">
               <NotificationBell userId={user.id} />
               <Link href={ROUTES.profile(user.id)}>
@@ -226,9 +226,10 @@ export default async function ExplorePage({ searchParams }: Props) {
                     <Link
                       key={u.id}
                       href={ROUTES.profile(u.id)}
-                      className="group sketch-panel-flat overflow-hidden transition hover:-translate-y-0.5"
+                      className="group sketch-panel overflow-hidden transition hover:-translate-y-0.5 hover:shadow-paper-deep"
+                      style={{ borderRadius: '18px 16px 20px 15px' }}
                     >
-                      <div className="flex items-center justify-center bg-paper-50 p-4">
+                      <div className="flex items-center justify-center bg-paper-100 p-5">
                         <div className="relative">
                           <Avatar
                             row={u}
@@ -238,7 +239,7 @@ export default async function ExplorePage({ searchParams }: Props) {
                             className="transition-transform group-hover:scale-[1.03]"
                           />
                           {isOnline && (
-                            <div className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-400" aria-label="Online now" />
+                            <div className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full border-2 border-white bg-scribble-green" aria-label="Online now" />
                           )}
                         </div>
                       </div>
@@ -250,7 +251,7 @@ export default async function ExplorePage({ searchParams }: Props) {
                               <p className="mt-1 truncate text-xs text-ink-500">{batch.programs.name} · {batch.label ?? batch.graduation_year}</p>
                             )}
                           </div>
-                          <span className="rounded-full bg-ink-900 px-2 py-1 text-[10px] font-semibold text-white">
+                          <span className="inline-flex items-center gap-1 rounded-xl border border-brand/40 px-3 py-1.5 text-xs font-semibold text-brand">
                             Sign
                           </span>
                         </div>

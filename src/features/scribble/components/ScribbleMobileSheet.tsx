@@ -120,7 +120,7 @@ export default function ScribbleMobileSheet(props: ScribbleMobileSheetProps) {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-30 md:hidden"
+      className="pointer-events-none fixed inset-x-0 z-30 lg:hidden"
       // Sit just above the mobile ScribbleBottomBar (≈60px tall + iOS safe-area).
       // This keeps the Publish CTA in the BottomBar always reachable, even when
       // the sheet is expanded over the canvas.

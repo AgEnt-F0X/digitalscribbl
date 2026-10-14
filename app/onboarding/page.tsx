@@ -1,602 +1,546 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import Avatar from '@/components/avatar/Avatar'
-import HeadCropUpload from '@/components/avatar/HeadCropUpload'
-import Whiteboard from '@/components/brand/Whiteboard'
+import PlaceBackground from '@/components/place/PlaceBackground'
+import DriftingDoodles from '@/components/brand/DriftingDoodles'
 import InkUnderline from '@/components/forms/InkUnderline'
-import { cn } from '@/lib/utils/cn'
-import { HERO_PRESETS } from '@/lib/utils/avatarResolve'
-import type { AvatarPresetId } from '@/src/features/avatar/types'
-import {
-  DEFAULT_SKIN_DEPTH,
-  DEFAULT_SKIN_UNDERTONE,
-  SKIN_TONE_ANCHORS,
-  skinToneFrom,
-} from '@/lib/utils/skinTone'
+import { Sparkles, Camera, ArrowRight, CheckCircle2, HelpCircle, X, School } from 'lucide-react'
 
-// Onboarding (doc 08 §10 + doc 16 synthesis + Round 3 PM cleanup +
-// Route 1 avatar lock-in):
-//   Step 1 — Basics (name + enrollment + batch grid). Sunlit Lawn round 6
-//            opens with an a-frame Whiteboard greeting (doc 18 § 3).
-//   Step 2 — Face (AI prompt + upload OR skip — no placeholder bank;
-//            customised faces are core to the product identity)
-//   Step 3 — Body pose (HERO_PRESETS grid) + skin (depth + undertone).
-//            Shirt colour is gone — Route 1 ships one canonical white
-//            shirt as the scribbling surface.
-//   Step 4 — Review (with Edit jumps + confetti once, at the end)
-//
-// Inputs across every step use the doc 18 § 14 InkUnderline wave; CTAs
-// use the pencil-button family so the school-physics hover applies.
+interface SchoolOption {
+  id: string
+  name: string
+}
 
-type Step = 1 | 2 | 3 | 4
-type FieldKey = 'displayName' | 'enrollmentNumber'
-
-interface FormState {
-  displayName:      string
-  enrollmentNumber: string
-  batchId:          string         // resolved from grid click
-  batchNumber:      number | null  // 1..52
-  presetId:         AvatarPresetId // Route 1 canonical avatar identity
-  bodyStyle:        string         // legacy back-compat; derived from presetId
-  skinDepth:        number         // 0..100  (lightness)
-  skinUndertone:    number         // -50..50 (cool ↔ warm)
-  headFrontUrl:     string | null
-  headBackUrl:      string | null
-  headSource:       'upload' | 'skipped'
+interface ProgramOption {
+  id: string
+  academic_group_id: string
+  name: string
 }
 
 interface BatchOption {
-  id:    string
+  id: string
+  program_id: string
+  graduation_year: number
   label: string
-  batchNumber: number
 }
-
-const AI_PROMPT = `A simple cartoon-style head-and-shoulders portrait of me, front view, looking at the camera, plain background, transparent PNG, no shirt, no shoulders below the collarbone, soft outlines, friendly expression — designed to be cropped into a yearbook avatar.`
 
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
-  const [step, setStep]   = useState<Step>(1)
+  const [step, setStep] = useState<1 | 2>(1)
   const [userId, setUserId] = useState<string | null>(null)
-  const [form, setForm]   = useState<FormState>({
-    displayName:      '',
-    enrollmentNumber: '',
-    batchId:          '',
-    batchNumber:      null,
-    presetId:         'm-classic-straight',
-    bodyStyle:        'M2',
-    skinDepth:        DEFAULT_SKIN_DEPTH,
-    skinUndertone:    DEFAULT_SKIN_UNDERTONE,
-    headFrontUrl:     null,
-    headBackUrl:      null,
-    headSource:       'skipped',
-  })
-  const [academicGroupId, setAcademicGroupId] = useState<string | null>(null)
-  const [programId, setProgramId] = useState<string | null>(null)
-  const [batches, setBatches]   = useState<BatchOption[]>([])
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState<string | null>(null)
-  const [promptCopied, setPromptCopied] = useState(false)
-  const [focused, setFocused] = useState<FieldKey | null>(null)
+  
+  // Step 1 State
+  const [displayName, setDisplayName] = useState('')
+  const [enrollmentNumber, setEnrollmentNumber] = useState('')
+  const [pfpUrl, setPfpUrl] = useState<string | null>(null)
+  const [isUploadingPfp, setIsUploadingPfp] = useState(false)
 
-  // ── Load user + B.Tech CS batches ─────────────────────────
+  // Step 2 State (Cascading Academic Data)
+  const [schools, setSchools] = useState<SchoolOption[]>([])
+  const [programs, setPrograms] = useState<ProgramOption[]>([])
+  const [batches, setBatches] = useState<BatchOption[]>([])
+  
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('')
+  const [selectedProgramId, setSelectedProgramId] = useState<string>('')
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('')
+
+  // Unlisted Program Modal State
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [reqSchool, setReqSchool] = useState('')
+  const [reqProgram, setReqProgram] = useState('')
+  const [reqBatch, setReqBatch] = useState('Class of 2026')
+  const [isSubmittingReq, setIsSubmittingReq] = useState(false)
+  const [reqSubmitted, setReqSubmitted] = useState(false)
+
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load user & academic dropdown data
   useEffect(() => {
-    let cancelled = false
-
     async function bootstrap() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-
-      const sync = await fetch('/api/auth/sync-user', { method: 'POST' })
-        .then(res => res.json())
-        .catch(() => null)
-      if (sync?.account_kind === 'external') {
-        router.push('/onboarding/guest')
+      if (!user) {
+        router.push('/login')
         return
       }
 
+      setUserId(user.id)
+      setDisplayName(user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? '')
+
+      // Check if user is guest or already completed onboarding
       const { data: profile } = await supabase
         .from('users')
-        .select('is_university_verified')
+        .select('onboarding_completed, is_guest, is_university_verified')
         .eq('id', user.id)
         .single()
-      if (profile && !profile.is_university_verified) {
+
+      if (profile?.is_guest && !profile.is_university_verified) {
         router.push('/onboarding/guest')
         return
       }
 
-      if (cancelled) return
-      setUserId(user.id)
-      setForm(f => ({
-        ...f,
-        displayName: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? '',
-      }))
-    }
+      if (profile?.onboarding_completed) {
+        router.push('/dashboard')
+        return
+      }
 
-    async function loadBatches() {
-      const { data: group } = await supabase
-        .from('academic_groups')
-        .select('id')
-        .eq('name', 'University')
-        .maybeSingle()
-      if (!group) return
+      // Fetch Academic Hierarchy Data
+      const { data: schoolRows } = await supabase.from('academic_groups').select('id, name').order('name')
+      const { data: programRows } = await supabase.from('programs').select('id, academic_group_id, name').order('name')
+      const { data: batchRows } = await supabase.from('batches').select('id, program_id, graduation_year, label').order('graduation_year', { ascending: false })
 
-      const { data: program } = await supabase
-        .from('programs')
-        .select('id')
-        .eq('academic_group_id', group.id)
-        .eq('name', 'B.Tech Computer Science')
-        .maybeSingle()
-      if (!program) return
+      if (schoolRows && schoolRows.length > 0) {
+        setSchools(schoolRows)
+        // Default to CS school if available
+        const csSchool = schoolRows.find(s => s.name.toLowerCase().includes('computer')) ?? schoolRows[0]
+        setSelectedSchoolId(csSchool.id)
+      }
 
-      const { data: batchRows } = await supabase
-        .from('batches')
-        .select('id, label')
-        .eq('program_id', program.id)
-        .order('label')
+      if (programRows && programRows.length > 0) {
+        setPrograms(programRows)
+      }
 
-      if (cancelled) return
-      setAcademicGroupId(group.id)
-      setProgramId(program.id)
-      setBatches(
-        (batchRows ?? [])
-          .map(b => ({
-            id: b.id,
-            label: b.label ?? '',
-            batchNumber: parseInt((b.label ?? '').replace(/\D/g, ''), 10) || 0,
-          }))
-          .filter(b => b.batchNumber > 0)
-          .sort((a, b) => a.batchNumber - b.batchNumber),
-      )
+      if (batchRows && batchRows.length > 0) {
+        setBatches(batchRows)
+      }
     }
 
     bootstrap()
-    loadBatches()
-
-    return () => { cancelled = true }
   }, [router, supabase])
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    setForm(f => ({ ...f, [k]: v }))
+  // Filtered Programs based on Selected School
+  const availablePrograms = useMemo(() => {
+    if (!selectedSchoolId) return programs
+    return programs.filter(p => p.academic_group_id === selectedSchoolId)
+  }, [programs, selectedSchoolId])
 
-  // ── Step gating ───────────────────────────────────────────
-  const canProceed1 =
-    form.displayName.trim().length > 0 &&
-    form.enrollmentNumber.trim().length > 0 &&
-    !!form.batchId
-  const canProceed2 = true
-  const canProceed3 = !!form.presetId
+  // Auto-select first program when school changes
+  useEffect(() => {
+    if (availablePrograms.length > 0) {
+      setSelectedProgramId(availablePrograms[0].id)
+    } else {
+      setSelectedProgramId('')
+    }
+  }, [availablePrograms])
 
-  const next = () => setStep(s => (Math.min(4, s + 1)) as Step)
-  const back = () => setStep(s => (Math.max(1, s - 1)) as Step)
-  const goTo = (s: Step) => setStep(s)
+  // Filtered Batches based on Selected Program
+  const availableBatches = useMemo(() => {
+    if (!selectedProgramId) return batches
+    return batches.filter(b => b.program_id === selectedProgramId)
+  }, [batches, selectedProgramId])
 
-  async function copyPrompt() {
+  // Auto-select first batch when program changes
+  useEffect(() => {
+    if (availableBatches.length > 0) {
+      setSelectedBatchId(availableBatches[0].id)
+    } else {
+      setSelectedBatchId('')
+    }
+  }, [availableBatches])
+
+  // Handle PFP Upload
+  const handlePfpUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingPfp(true)
+    setError(null)
+
     try {
-      await navigator.clipboard.writeText(AI_PROMPT)
-      setPromptCopied(true)
-      setTimeout(() => setPromptCopied(false), 2500)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('side', 'front')
+
+      const res = await fetch('/api/avatar/upload-head', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (res.ok && data.url) {
+        setPfpUrl(data.url)
+      } else {
+        setError(data.error ?? 'PFP Upload failed')
+      }
     } catch {
-      /* clipboard refused — surface nothing, the user can select+copy by hand */
+      setError('Failed to upload image')
+    } finally {
+      setIsUploadingPfp(false)
     }
   }
 
-  function clearFace() {
-    set('headFrontUrl', null)
-    set('headBackUrl', null)
-    set('headSource', 'skipped')
+  // Handle Unlisted Program Request
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reqSchool || !reqProgram || !reqBatch) return
+
+    setIsSubmittingReq(true)
+    try {
+      const res = await fetch('/api/onboarding/request-program', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolName: reqSchool,
+          programName: reqProgram,
+          batchLabel: reqBatch,
+        }),
+      })
+
+      if (res.ok) {
+        setReqSubmitted(true)
+        setTimeout(() => {
+          setShowRequestModal(false)
+          setReqSubmitted(false)
+        }, 2000)
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setIsSubmittingReq(false)
+    }
   }
 
-  // ── Save ──────────────────────────────────────────────────
-  const complete = async () => {
-    if (!userId || !academicGroupId || !programId) return
-    setSaving(true)
-    setError(null)
-
-    const resolvedSkin = skinToneFrom(form.skinDepth, form.skinUndertone)
-    const legacyBodyStyle = form.presetId.startsWith('m-') ? 'M2' : 'F1'
-
-    const { error: err } = await supabase.from('users').update({
-      display_name:      form.displayName.trim(),
-      enrollment_number: form.enrollmentNumber.trim(),
-      academic_group_id: academicGroupId,
-      program_id:        programId,
-      batch_id:          form.batchId,
-      body_style:        legacyBodyStyle,
-      head_front_url:    form.headFrontUrl,
-      head_back_url:     form.headBackUrl,
-      avatar_config:     {
-        presetId: form.presetId,
-        skinTone: {
-          mode:      'slider-v2',
-          depth:     resolvedSkin.depth,
-          undertone: resolvedSkin.undertone,
-          hex:       resolvedSkin.hex,
-        },
-        headSource: form.headSource,
-      },
-      onboarding_completed: true,
-    }).eq('id', userId)
-
-    if (err) {
-      setError('Could not save your profile — please try again.')
-      setSaving(false)
+  // Complete Onboarding
+  const handleComplete = async () => {
+    if (!userId || !displayName.trim() || !enrollmentNumber.trim()) {
+      setError('Please fill in your name and enrollment number.')
       return
     }
 
-    try {
-      const confetti = (await import('canvas-confetti')).default
-      confetti({
-        particleCount: 160,
-        spread: 90,
-        origin: { y: 0.55 },
-        colors: ['#1C1C1C', '#F8F8F8', '#6B8E6B', '#1E3A5F', '#F5F0E0'],
-      })
-    } catch { /* non-critical */ }
+    setSaving(true)
+    setError(null)
 
-    router.push('/dashboard?onboarded=1')
+    const payload = {
+      displayName: displayName.trim(),
+      enrollmentNumber: enrollmentNumber.trim(),
+      academicGroupId: selectedSchoolId,
+      programId: selectedProgramId,
+      batchId: selectedBatchId,
+      avatarConfig: {
+        presetId: 'm-classic-straight',
+        skinToneId: 'skin_03',
+        skinTone: { depth: 50, undertone: 50, hex: '#e5b899' },
+        headSource: pfpUrl ? 'upload' : 'skipped',
+        frontFaceImageUrl: pfpUrl ?? undefined,
+        lockedAt: new Date().toISOString(),
+      },
+    }
+
+    try {
+      const res = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+      if (res.ok && data.success) {
+        // Clear local draft and go to dashboard!
+        localStorage.removeItem('scribbl-onboarding-draft')
+        router.push('/dashboard')
+      } else {
+        setError(data.error ? `Could not save: ${data.error}` : 'Could not complete setup. Please try again.')
+        setSaving(false)
+      }
+    } catch {
+      setError('Network error during setup. Please try again.')
+      setSaving(false)
+    }
   }
 
-  const skin = skinToneFrom(form.skinDepth, form.skinUndertone)
-  const depthTrack = `linear-gradient(to right, ${SKIN_TONE_ANCHORS.map(a => a.hex).join(', ')})`
-  const undertoneSamples = [-50, -25, 0, 25, 50].map(u => skinToneFrom(form.skinDepth, u).hex)
-  const undertoneTrack = `linear-gradient(to right, ${undertoneSamples.join(', ')})`
+  const selectedSchoolObj = schools.find(s => s.id === selectedSchoolId)
+  const selectedProgramObj = programs.find(p => p.id === selectedProgramId)
+  const selectedBatchObj = batches.find(b => b.id === selectedBatchId)
 
-  // First-name fallback for the welcome whiteboard. Empty value uses
-  // "friend" so the greeting reads naturally before the field is filled.
-  const firstName = (form.displayName.trim().split(/\s+/)[0] ?? '').trim() || 'friend'
-
-  const displayNameActive    = focused === 'displayName'    || form.displayName.length > 0
-  const enrollmentActive     = focused === 'enrollmentNumber' || form.enrollmentNumber.length > 0
-
-  // ── Render ────────────────────────────────────────────────
   return (
-    <div className="scribbl-page min-h-screen py-10 px-4">
-      <div className="max-w-lg mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-hero-display">scribbl</h1>
-          <p className="text-nostalgia mt-1">Set up your scribble shirt</p>
-        </div>
+    <div className="relative min-h-screen bg-paper-100 text-ink-900 selection:bg-amber-200">
+      <PlaceBackground surface="login" illustration="lawn-golden-hour" alwaysVivid className="opacity-40 pointer-events-none" />
+      <DriftingDoodles density="medium" />
 
-        <div className="flex gap-2 mb-8" aria-label={`Step ${step} of 4`}>
-          {[1, 2, 3, 4].map(s => (
-            <div key={s} className={cn(
-              'flex-1 h-1.5 rounded-full transition-all duration-500',
-              s <= step ? 'bg-ink-900' : 'bg-paper-300',
-            )} />
-          ))}
-        </div>
-
-        {/* ── Step 1 — Basics ── */}
-        {step === 1 && (
-          <div className="card p-6 space-y-5">
-            {/* Welcome whiteboard — Sunlit Lawn warm greeting beat. */}
-            <div className="flex justify-center -mt-2">
-              <div className="w-44 sm:w-48">
-                <Whiteboard
-                  variant="a-frame"
-                  title={`welcome, ${firstName}!`}
-                  subtitle="let's set up your shirt"
-                  markerColor="blue"
-                  rotation="left"
-                />
-              </div>
-            </div>
-
-            <h2 className="text-eyebrow-display">The basics</h2>
-
-            <div>
-              <label className="label" htmlFor="onboarding-display-name">Display name</label>
-              <div className="relative">
-                <input
-                  id="onboarding-display-name"
-                  className="input"
-                  value={form.displayName}
-                  onChange={e => set('displayName', e.target.value)}
-                  onFocus={() => setFocused('displayName')}
-                  onBlur={() => setFocused(null)}
-                  placeholder="Your name"
-                />
-                <InkUnderline active={displayNameActive} />
-              </div>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="onboarding-enrollment">Enrollment number</label>
-              <div className="relative">
-                <input
-                  id="onboarding-enrollment"
-                  className="input"
-                  value={form.enrollmentNumber}
-                  onChange={e => set('enrollmentNumber', e.target.value)}
-                  onFocus={() => setFocused('enrollmentNumber')}
-                  onBlur={() => setFocused(null)}
-                  placeholder="e.g. 22CS001"
-                />
-                <InkUnderline active={enrollmentActive} />
-              </div>
-            </div>
-
-            <div>
-              <span className="label">Program</span>
-              <div className="input flex items-center justify-between bg-paper-50 text-ink-500">
-                <span>B.Tech Computer Science</span>
-                <span className="text-xs text-ink-500">v1 cohort</span>
-              </div>
-              <p className="mt-1 text-xs text-ink-500">
-                Other courses will be added when classmates request access.
-              </p>
-            </div>
-
-            <div>
-              <span className="label">Your batch (01 – 52)</span>
-              {batches.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-black/15 bg-white/50 p-3 text-xs text-ink-500">
-                  Loading batches…
-                </p>
-              ) : (
-                <div className="grid grid-cols-6 gap-1.5">
-                  {batches.map(b => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => {
-                        set('batchId', b.id)
-                        set('batchNumber', b.batchNumber)
-                      }}
-                      aria-pressed={form.batchId === b.id}
-                      className={cn(
-                        'rounded-lg border px-1.5 py-2 text-xs font-semibold transition',
-                        form.batchId === b.id
-                          ? 'border-ink-900 bg-ink-900 text-white'
-                          : 'border-paper-300 bg-white text-ink-900 hover:border-ink-500',
-                      )}
-                    >
-                      {String(b.batchNumber).padStart(2, '0')}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {form.batchNumber !== null && (
-                <p className="mt-1 text-xs text-ink-500">
-                  Selected: Batch {String(form.batchNumber).padStart(2, '0')}
-                </p>
-              )}
-            </div>
-
-            <button
-              className="pencil-button-primary w-full mt-2"
-              disabled={!canProceed1}
-              onClick={next}
-            >
-              Next →
-            </button>
+      {/* Header */}
+      <header className="relative z-20 border-b border-paper-300 bg-paper-100/70 backdrop-blur-md px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="font-display text-2xl font-black text-ink-900 tracking-tight flex items-center gap-2">
+            <span className="text-amber-600 text-3xl">✨</span> scribbl
           </div>
-        )}
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <span>Step {step} of 2</span>
+          </div>
+        </div>
+      </header>
 
-        {/* ── Step 2 — Face ── */}
-        {step === 2 && (
-          <div className="card p-6 space-y-5">
-            <div>
-              <h2 className="text-eyebrow-display">Your face</h2>
-              <p className="text-sm text-ink-500 mt-1">
-                A customised face is the whole point of your shirt — your friends should
-                recognise you. Generate one with the prompt below, upload it, or skip and
-                add it later from Settings.
+      {/* Studio Split-Screen Container */}
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Column: Live Identity Preview Card */}
+          <div className="lg:col-span-5 flex flex-col items-center">
+            <div className="w-full p-6 bg-white rounded-3xl border-2 border-paper-300 shadow-xl flex flex-col items-center text-center relative overflow-hidden">
+              <div className="w-28 h-28 rounded-full bg-paper-200 border-2 border-paper-300 overflow-hidden relative mb-4 flex items-center justify-center shadow-inner">
+                {pfpUrl ? (
+                  <img src={pfpUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-4xl">🎓</span>
+                )}
+                {isUploadingPfp && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center text-white text-xs font-semibold">
+                    Uploading...
+                  </div>
+                )}
+              </div>
+
+              <h2 className="font-display font-black text-xl text-ink-900 truncate max-w-full">
+                {displayName || 'Your Full Name'}
+              </h2>
+              <p className="text-xs font-mono text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md mt-1 border border-amber-200">
+                {enrollmentNumber || 'Enrollment Number'}
               </p>
+
+              <div className="mt-4 pt-4 border-t border-paper-200 w-full text-xs text-gray-600 flex flex-col gap-1">
+                <p className="font-medium text-ink-800">{selectedSchoolObj?.name ?? 'Bennett University'}</p>
+                <p className="text-gray-500">{selectedProgramObj?.name ?? 'Program'} · {selectedBatchObj?.label ?? 'Class of 2026'}</p>
+              </div>
+
+              <div className="mt-4 px-3 py-1.5 rounded-full bg-paper-100 text-[11px] font-semibold text-gray-500 border border-paper-300">
+                ✨ Virtual Shirt #1 Ready
+              </div>
             </div>
 
-            <div className="flex justify-center">
-              <Avatar
-                presetId={form.presetId}
-                headFrontUrl={form.headFrontUrl}
-                displayName={form.displayName}
-                size="lg"
-              />
-            </div>
+            <p className="text-xs text-gray-500 text-center mt-3 max-w-xs">
+              Don’t worry! You can personalize your full 3D Avatar & AI head anytime inside your dashboard after setup.
+            </p>
+          </div>
 
-            <details open className="rounded-xl border border-dashed border-black/15 bg-white/60 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-ink-900">
-                1 · Generate your portrait
-              </summary>
-              <div className="mt-3 space-y-2">
-                <textarea
-                  readOnly
-                  value={AI_PROMPT}
-                  rows={4}
-                  className="w-full resize-none rounded-lg border border-black/10 bg-white p-2 text-xs leading-relaxed text-ink-700"
-                  aria-label="AI portrait prompt"
-                />
-                <div className="flex items-center justify-between text-xs text-ink-500">
-                  <span>Paste into ChatGPT or Ideogram, then come back and upload it.</span>
+          {/* Right Column: Step Controls Form */}
+          <div className="lg:col-span-7 bg-white/95 backdrop-blur-md p-6 sm:p-8 rounded-3xl border-2 border-paper-300 shadow-xl">
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                ⚠️ {error}
+              </div>
+            )}
+
+            {step === 1 ? (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Phase 1 · Step 1</span>
+                  <h2 className="font-display font-black text-2xl sm:text-3xl text-ink-900 mt-1">
+                    Student Identity & Photo
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                    Enter your display name and upload a real profile photo so classmates can easily identify you.
+                  </p>
+                </div>
+
+                {/* Display Name Input */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                    Full Display Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Rudra Prasad"
+                    className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-sans text-sm focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  />
+                  <InkUnderline active={displayName.length > 0} />
+                </div>
+
+                {/* Enrollment Number Input */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                    Roll / Enrollment Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={enrollmentNumber}
+                    onChange={(e) => setEnrollmentNumber(e.target.value)}
+                    placeholder="e.g. E22CSEU1042"
+                    className="w-full px-4 py-3 rounded-xl border border-paper-300 bg-paper-100/60 font-mono text-sm focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  />
+                  <InkUnderline active={enrollmentNumber.length > 0} />
+                </div>
+
+                {/* PFP Upload Option */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                    Profile Photo (PFP)
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-paper-200 border border-paper-300 text-ink-900 font-semibold text-xs hover:bg-paper-300 transition shadow-sm">
+                      <Camera className="w-4 h-4 text-amber-600" />
+                      <span>{pfpUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                      <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handlePfpUpload} className="hidden" />
+                    </label>
+                    <span className="text-xs text-gray-500">PNG, JPG or WebP (max 5MB)</span>
+                  </div>
+                </div>
+
+                {/* Next Step Button */}
+                <button
+                  onClick={() => {
+                    if (!displayName.trim() || !enrollmentNumber.trim()) {
+                      setError('Please enter your full name and enrollment number.')
+                      return
+                    }
+                    setError(null)
+                    setStep(2)
+                  }}
+                  className="mt-4 w-full py-4 rounded-2xl bg-amber-600 text-white font-display font-bold text-base hover:bg-amber-700 transition shadow-md flex items-center justify-center gap-2"
+                >
+                  <span>Continue to School & Batch</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Phase 1 · Step 2</span>
+                  <h2 className="font-display font-black text-2xl sm:text-3xl text-ink-900 mt-1">
+                    Select Your School & Program
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                    Select your Bennett University academic school, degree program, and graduation batch.
+                  </p>
+                </div>
+
+                {/* CSE Launch Focus Card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 shadow-sm flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                      Active Launch Focus
+                    </span>
+                    <span className="text-xs font-bold text-amber-700">Class of 2026</span>
+                  </div>
+                  <h3 className="font-display font-black text-lg text-ink-900 mt-1">
+                    School of Computer Science & Engineering
+                  </h3>
+                  <p className="text-xs text-gray-600 font-sans">
+                    Program: <strong className="text-ink-900">B.Tech Computer Science (CSE)</strong>
+                  </p>
+                </div>
+
+                {/* Contact Me / Request Course Button */}
+                <div className="p-4 rounded-xl bg-paper-100 border border-paper-300 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-left text-xs">
+                    <p className="font-bold text-ink-900">From another school or course?</p>
+                    <p className="text-gray-500">Contact me to add your school and batch immediately.</p>
+                  </div>
                   <button
                     type="button"
-                    onClick={copyPrompt}
-                    className="font-semibold text-ink-900 underline-offset-2 hover:underline"
+                    onClick={() => setShowRequestModal(true)}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-white border border-amber-400 text-amber-900 font-bold text-xs hover:bg-amber-50 transition shadow-xs flex items-center gap-1.5"
                   >
-                    {promptCopied ? 'Copied' : 'Copy prompt'}
+                    <HelpCircle className="w-4 h-4 text-amber-600" />
+                    <span>Contact Me / Add Course</span>
+                  </button>
+                </div>
+
+                {/* Buttons */}
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="px-6 py-4 rounded-2xl bg-paper-200 border border-paper-300 text-ink-800 font-semibold text-sm hover:bg-paper-300 transition"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleComplete}
+                    disabled={saving}
+                    className="flex-1 py-4 rounded-2xl bg-amber-600 text-white font-display font-bold text-base hover:bg-amber-700 transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <span>Saving Profile...</span>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" />
+                        <span>Complete Setup & Enter App</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
-            </details>
-
-            <div>
-              <span className="label">2 · Upload your portrait</span>
-              <HeadCropUpload
-                side="front"
-                currentUrl={form.headSource === 'upload' ? form.headFrontUrl : null}
-                onUploaded={url => {
-                  set('headFrontUrl', url)
-                  set('headSource', 'upload')
-                }}
-              />
-              {form.headSource === 'upload' && form.headFrontUrl && (
-                <button
-                  type="button"
-                  onClick={clearFace}
-                  className="mt-2 text-xs font-medium text-ink-500 underline hover:text-ink-700"
-                >
-                  Clear and skip for now
-                </button>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button className="pencil-button flex-1" onClick={back}>← Back</button>
-              <button className="pencil-button-primary flex-1" disabled={!canProceed2} onClick={next}>
-                {form.headSource === 'upload' ? 'Next →' : 'Skip for now →'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 3 — Body pose + skin tone ── */}
-        {step === 3 && (
-          <div className="card p-6 space-y-6">
-            <h2 className="text-eyebrow-display">Your body</h2>
-
-            <div className="flex justify-center">
-              <Avatar
-                presetId={form.presetId}
-                headFrontUrl={form.headFrontUrl}
-                displayName={form.displayName}
-                size="lg"
-              />
-            </div>
-
-            <div>
-              <span className="label">Body pose</span>
-              <div className="grid grid-cols-3 gap-3">
-                {HERO_PRESETS.map(preset => {
-                  const isSelected = form.presetId === preset.id
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => set('presetId', preset.id)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        'flex flex-col items-center gap-2 rounded-xl border-2 p-3 text-xs text-center transition',
-                        isSelected
-                          ? 'border-ink-900 bg-ink-900/5'
-                          : 'border-paper-300 hover:border-ink-500',
-                      )}
-                    >
-                      <Avatar presetId={preset.id} size="sm" />
-                      <span className="font-medium text-ink-900">{preset.name}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="label mb-0">Skin tone</span>
-                <span
-                  className="inline-flex h-7 w-7 rounded-full border border-black/15 shadow-inner"
-                  style={{ backgroundColor: skin.hex }}
-                  aria-label={`Current skin preview, hex ${skin.hex}`}
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-xs text-ink-500">
-                  <span>Light</span>
-                  <span className="font-medium text-ink-900">Depth</span>
-                  <span>Deep</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={form.skinDepth}
-                  onChange={e => set('skinDepth', Number(e.target.value))}
-                  aria-label={`Skin depth (${form.skinDepth} of 100)`}
-                  className="mt-1 h-3 w-full cursor-pointer appearance-none rounded-full"
-                  style={{ background: depthTrack }}
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-xs text-ink-500">
-                  <span>Cool</span>
-                  <span className="font-medium text-ink-900">Undertone</span>
-                  <span>Warm</span>
-                </div>
-                <input
-                  type="range"
-                  min={-50}
-                  max={50}
-                  value={form.skinUndertone}
-                  onChange={e => set('skinUndertone', Number(e.target.value))}
-                  aria-label={`Skin undertone (${form.skinUndertone}, range -50 cool to 50 warm)`}
-                  className="mt-1 h-3 w-full cursor-pointer appearance-none rounded-full"
-                  style={{ background: undertoneTrack }}
-                />
-              </div>
-
-              <p className="text-xs text-ink-500">
-                Two sliders — lightness and warmth. Curated range only; no raw colour picker.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button className="pencil-button flex-1" onClick={back}>← Back</button>
-              <button className="pencil-button-primary flex-1" disabled={!canProceed3} onClick={next}>
-                Next →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 4 — Review ── */}
-        {step === 4 && (
-          <div className="card p-8 space-y-6">
-            <div className="flex justify-center">
-              <Avatar
-                presetId={form.presetId}
-                headFrontUrl={form.headFrontUrl}
-                displayName={form.displayName}
-                size="xl"
-              />
-            </div>
-
-            <div className="text-center">
-              <h2 className="text-hero-display">Looks like you?</h2>
-              <p className="text-nostalgia mt-1">
-                Tap any section to tweak. Everything is editable from Settings later too.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <button className="pencil-button text-xs py-2" onClick={() => goTo(1)}>Edit basics</button>
-              <button className="pencil-button text-xs py-2" onClick={() => goTo(2)}>Edit face</button>
-              <button className="pencil-button text-xs py-2" onClick={() => goTo(3)}>Edit body</button>
-            </div>
-
-            {form.headSource === 'skipped' && (
-              <p className="rounded-xl border border-dashed border-black/15 bg-white/60 p-3 text-center text-xs text-ink-500">
-                No face yet — you&apos;ll see a friendly placeholder until you add one in Settings.
-              </p>
             )}
-
-            {error && <p className="text-sm text-red-500 text-center" role="alert">{error}</p>}
-
-            <button
-              className="pencil-button-primary w-full text-base py-3"
-              onClick={complete}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Looks good — open my dashboard'}
-            </button>
           </div>
-        )}
-      </div>
+        </div>
+      </main>
+
+      {/* Unlisted Program Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-2 border-paper-300 shadow-2xl p-6 sm:p-8 max-w-md w-full relative">
+            <button
+              onClick={() => setShowRequestModal(false)}
+              className="absolute top-4 right-4 p-1 rounded-full hover:bg-paper-100 text-gray-400 hover:text-ink-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <School className="w-5 h-5 text-amber-600" />
+              <h3 className="font-display font-bold text-xl text-ink-900">Request Course / Batch</h3>
+            </div>
+            <p className="text-xs text-gray-600 mb-6">
+              Let us know which school or program you belong to, and we will activate it in the database immediately!
+            </p>
+
+            {reqSubmitted ? (
+              <div className="py-6 text-center text-emerald-800 font-semibold text-sm flex flex-col items-center gap-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                <span>Request Logged! We will add your course right away.</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitRequest} className="flex flex-col gap-4 text-xs">
+                <div>
+                  <label className="block font-bold uppercase text-gray-700 mb-1">School Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={reqSchool}
+                    onChange={(e) => setReqSchool(e.target.value)}
+                    placeholder="e.g. School of Media & Liberal Arts"
+                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold uppercase text-gray-700 mb-1">Program Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={reqProgram}
+                    onChange={(e) => setReqProgram(e.target.value)}
+                    placeholder="e.g. BA Journalism & Mass Comm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold uppercase text-gray-700 mb-1">Graduation Batch</label>
+                  <input
+                    type="text"
+                    required
+                    value={reqBatch}
+                    onChange={(e) => setReqBatch(e.target.value)}
+                    placeholder="e.g. Class of 2026"
+                    className="w-full px-3 py-2.5 rounded-xl border border-paper-300 bg-paper-100/60 font-sans"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingReq}
+                  className="mt-2 py-3 rounded-xl bg-ink-900 text-white font-bold hover:bg-ink-800 transition"
+                >
+                  {isSubmittingReq ? 'Submitting...' : 'Submit Program Request'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,60 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched classroom hall (desktop placeholder)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="University classroom hall — wooden desks, a blackboard, tall windows, and a ceiling clock in warm afternoon light">
   <defs>
     <linearGradient id="wall-d" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff1cf"/>
-      <stop offset="60%" stop-color="#f5dfaa"/>
+      <stop offset="0%" stop-color="#fcedd4"/>
+      <stop offset="55%" stop-color="#f5dfaa"/>
       <stop offset="100%" stop-color="#e8c890"/>
     </linearGradient>
     <linearGradient id="floor-d" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#d6b985"/>
       <stop offset="100%" stop-color="#a98c5b"/>
     </linearGradient>
-    <radialGradient id="window-d" cx="0.5" cy="0.45" r="0.5">
-      <stop offset="0%" stop-color="#fff6d9" stop-opacity="0.85"/>
+    <radialGradient id="window-light" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0%" stop-color="#fff6d9" stop-opacity="0.9"/>
       <stop offset="100%" stop-color="#fff6d9" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="board-d" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a4a2a"/>
+      <stop offset="100%" stop-color="#1a351a"/>
+    </linearGradient>
+    <linearGradient id="desk-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#caa56a"/>
+      <stop offset="100%" stop-color="#b08850"/>
+    </linearGradient>
   </defs>
   <rect width="1920" height="1080" fill="url(#wall-d)"/>
-  <path d="M0 720 L 1920 720 L 1920 1080 L 0 1080 Z" fill="url(#floor-d)"/>
-  <path d="M0 0 L 960 460 L 1920 0 Z" fill="#f8e6b7" opacity="0.55"/>
-  <g stroke="#7a6238" stroke-width="2.4" fill="none" opacity="0.65">
-    <path d="M0 0 L 960 460" stroke-linecap="round"/>
-    <path d="M1920 0 L 960 460" stroke-linecap="round"/>
-    <path d="M0 720 L 960 460" stroke-linecap="round"/>
-    <path d="M1920 720 L 960 460" stroke-linecap="round"/>
+  <path d="M0 680 L 1920 680 L 1920 1080 L 0 1080 Z" fill="url(#floor-d)"/>
+  <path d="M0 680 L 1920 680" stroke="#7a6238" stroke-width="1.5" opacity="0.3"/>
+  <path d="M0 0 L 960 440 L 1920 0 Z" fill="#f8e6b7" opacity="0.5"/>
+  <g stroke="#7a6238" stroke-width="2" fill="none" opacity="0.55">
+    <path d="M0 0 L 960 440" stroke-linecap="round"/>
+    <path d="M1920 0 L 960 440" stroke-linecap="round"/>
+    <path d="M0 680 L 960 440" stroke-linecap="round"/>
+    <path d="M1920 680 L 960 440" stroke-linecap="round"/>
   </g>
-  <g stroke="#7a6238" stroke-width="1.8" fill="none" opacity="0.42">
-    <path d="M0 1080 L 960 460"/>
-    <path d="M1920 1080 L 960 460"/>
-    <path d="M300 1080 L 960 460"/>
-    <path d="M1620 1080 L 960 460"/>
-    <path d="M620 1080 L 960 460"/>
-    <path d="M1300 1080 L 960 460"/>
+  <g stroke="#7a6238" stroke-width="1.4" fill="none" opacity="0.35">
+    <path d="M0 1080 L 960 440"/>
+    <path d="M1920 1080 L 960 440"/>
+    <path d="M320 1080 L 960 440"/>
+    <path d="M1600 1080 L 960 440"/>
+    <path d="M640 1080 L 960 440"/>
+    <path d="M1280 1080 L 960 440"/>
+  </g>
+  <g opacity="0.75">
+    <rect x="700" y="340" width="520" height="240" fill="url(#board-d)" rx="6"/>
+    <rect x="700" y="340" width="520" height="240" fill="none" stroke="#5a7a5a" stroke-width="4" rx="6"/>
+    <path d="M740 400 q 80 20 160 10 t 180 24" stroke="#fff" stroke-width="2" fill="none" opacity="0.3" stroke-linecap="round"/>
+    <path d="M780 430 q 60 14 130 6 t 150 20" stroke="#fff" stroke-width="1.5" fill="none" opacity="0.2" stroke-linecap="round"/>
+    <rect x="716" y="356" width="488" height="16" fill="#3a5a3a" rx="2"/>
   </g>
   <g opacity="0.7">
-    <rect x="760" y="360" width="400" height="200" fill="#fbf8ee" stroke="#8a93a0" stroke-width="6" rx="4"/>
-    <rect x="780" y="380" width="360" height="160" fill="url(#window-d)"/>
-    <path d="M780 480 q 80 -30 150 -10 t 210 -16" stroke="#2563eb" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
-    <path d="M820 510 l 60 -14 l -20 26 z" fill="#d83f6b" opacity="0.5"/>
+    <rect x="768" y="360" width="384" height="200" fill="url(#window-light)"/>
   </g>
-  <g opacity="0.55" stroke="#5b4524" stroke-width="2.8" fill="#e6cf9a">
-    <rect x="160" y="720" width="260" height="120" rx="6"/>
-    <rect x="160" y="720" width="260" height="36" rx="6" fill="#caa56a"/>
-    <line x1="170" y1="840" x2="170" y2="940" stroke-width="6" stroke-linecap="round"/>
-    <line x1="410" y1="840" x2="410" y2="940" stroke-width="6" stroke-linecap="round"/>
-    <rect x="540" y="730" width="240" height="100" rx="6"/>
-    <line x1="550" y1="830" x2="550" y2="916" stroke-width="6" stroke-linecap="round"/>
-    <line x1="770" y1="830" x2="770" y2="916" stroke-width="6" stroke-linecap="round"/>
-    <rect x="1140" y="730" width="240" height="100" rx="6"/>
-    <line x1="1150" y1="830" x2="1150" y2="916" stroke-width="6" stroke-linecap="round"/>
-    <line x1="1370" y1="830" x2="1370" y2="916" stroke-width="6" stroke-linecap="round"/>
-    <rect x="1500" y="720" width="260" height="120" rx="6"/>
-    <rect x="1500" y="720" width="260" height="36" rx="6" fill="#caa56a"/>
-    <line x1="1510" y1="840" x2="1510" y2="940" stroke-width="6" stroke-linecap="round"/>
-    <line x1="1750" y1="840" x2="1750" y2="940" stroke-width="6" stroke-linecap="round"/>
+  <g opacity="0.55" stroke="#5b4524" stroke-width="2.4" fill="#e6cf9a">
+    <rect x="140" y="680" width="280" height="130" rx="6"/>
+    <rect x="140" y="680" width="280" height="34" rx="6" fill="url(#desk-top)"/>
+    <line x1="150" y1="810" x2="150" y2="920" stroke-width="6" stroke-linecap="round"/>
+    <line x1="410" y1="810" x2="410" y2="920" stroke-width="6" stroke-linecap="round"/>
+    <rect x="500" y="690" width="260" height="110" rx="6"/>
+    <rect x="500" y="690" width="260" height="30" rx="6" fill="url(#desk-top)"/>
+    <line x1="510" y1="800" x2="510" y2="900" stroke-width="5" stroke-linecap="round"/>
+    <line x1="750" y1="800" x2="750" y2="900" stroke-width="5" stroke-linecap="round"/>
+    <rect x="1140" y="690" width="260" height="110" rx="6"/>
+    <rect x="1140" y="690" width="260" height="30" rx="6" fill="url(#desk-top)"/>
+    <line x1="1150" y1="800" x2="1150" y2="900" stroke-width="5" stroke-linecap="round"/>
+    <line x1="1390" y1="800" x2="1390" y2="900" stroke-width="5" stroke-linecap="round"/>
+    <rect x="1500" y="680" width="280" height="130" rx="6"/>
+    <rect x="1500" y="680" width="280" height="34" rx="6" fill="url(#desk-top)"/>
+    <line x1="1510" y1="810" x2="1510" y2="920" stroke-width="6" stroke-linecap="round"/>
+    <line x1="1770" y1="810" x2="1770" y2="920" stroke-width="6" stroke-linecap="round"/>
   </g>
-  <g opacity="0.4" stroke="#3D2E14" stroke-width="1.5" fill="none">
-    <path d="M210 980 l 14 -22 l 14 22"/>
-    <path d="M1560 980 l 14 -22 l 14 22"/>
+  <g opacity="0.18" fill="#3d2e14">
+    <rect x="180" y="710" width="40" height="5" rx="2"/>
+    <rect x="240" y="710" width="40" height="5" rx="2"/>
+    <rect x="300" y="710" width="40" height="5" rx="2"/>
+    <rect x="340" y="710" width="40" height="5" rx="2"/>
+  </g>
+  <g opacity="0.35" stroke="#3d2e14" stroke-width="1.2" fill="none" stroke-linecap="round">
+    <path d="M160 990 l12 -20 l12 20 M1560 990 l12 -20 l12 20 M920 1000 l12 -20 l12 20"/>
+  </g>
+  <g opacity="0.25">
+    <line x1="960" y1="80" x2="960" y2="60" stroke="#7a6238" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="960" cy="100" r="28" fill="none" stroke="#7a6238" stroke-width="2.5"/>
+    <circle cx="960" cy="100" r="3" fill="#7a6238"/>
+    <line x1="960" y1="100" x2="960" y2="78" stroke="#7a6238" stroke-width="2" stroke-linecap="round"/>
+    <line x1="960" y1="100" x2="978" y2="110" stroke="#7a6238" stroke-width="2" stroke-linecap="round"/>
   </g>
 </svg>

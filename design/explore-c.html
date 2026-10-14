@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scribbl — House Colours, the full system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@100..900&family=Caveat:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.css">
+<style>
+  /* ================= House Colours system tokens =================
+     field: one per shirt colour. ink carries all chrome. no accent,
+     except the live tick (red) reserved for "signing is happening now". */
+  .screen { font-size: 16px; }
+  .c { font-family: "Big Shoulders Display", sans-serif; color: #191410; background: #E29A2E; }
+  .c .weave { position: absolute; inset: 0; opacity: .05; pointer-events: none;
+    background: repeating-linear-gradient(0deg, #191410 0 1px, transparent 1px 4px),
+                repeating-linear-gradient(90deg, #191410 0 1px, transparent 1px 4px); }
+  .c .dye { position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(155deg, rgba(255,248,225,.16) 0%, rgba(255,248,225,.06) 32%, rgba(255,248,225,0) 56%); }
+  .c-night { color: #F4EDE1; background: #22201C; }
+  .c-cobalt { color: #F4F1E8; background: #2E4FA3; }
+
+  .wrap { position: absolute; inset: 0; padding: 18px 20px 88px; display: flex; flex-direction: column; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .2em; }
+  .caps { text-transform: uppercase; }
+  .live { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: #C43A2E; }
+
+  h1.poster { font-size: 56px; font-weight: 800; line-height: .92; letter-spacing: -.005em; text-transform: uppercase; margin: 12px 0 0; }
+  .status { margin: 8px 0 0; font-size: 16px; font-weight: 600; }
+  .meta { font-size: 12.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+
+  .shirt { filter: drop-shadow(9px 10px 0 rgba(25,20,16,.16)); }
+
+  .tabs { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; }
+  .tab { font-size: 12.5px; font-weight: 700; letter-spacing: .12em; opacity: .62; padding-bottom: 7px; }
+  .tab.on { opacity: 1; box-shadow: inset 0 -3px 0 currentColor; }
+  .zones { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; opacity: .8; }
+
+  .primary { width: 100%; min-height: 54px; border: none; border-radius: 12px; background: #191410; color: #FAF7F0;
+    font-family: "Big Shoulders Display", sans-serif; font-size: 19px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .c-night .primary { background: #F4EDE1; color: #191410; }
+  .pill { display: block; width: 100%; margin-top: 8px; min-height: 50px; background: transparent; color: inherit; border: 1.5px solid currentColor;
+    border-radius: 12px; font-family: "Big Shoulders Display", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+
+  .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; display: grid; grid-template-columns: repeat(4, 1fr);
+    align-items: center; border-top: 1.5px solid rgba(25,20,16,.28); }
+  .c-night .bottom { border-top-color: rgba(244,237,225,.25); }
+  .bitem { display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 700; letter-spacing: .08em; opacity: .62; }
+  .bitem.on { opacity: 1; }
+
+  .wallnote { position: absolute; font-family: "Caveat", cursive; font-size: 16.5px; line-height: 1; }
+  .wallnote span { display: block; font-family: "Big Shoulders Display", sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; opacity: .72; margin-top: 2px; }
+
+  /* whiteboard on-field (carried from the incumbent, ink voice) */
+  .wb { background: #FAF7F0; border: 4px solid #191410; border-radius: 6px; padding: 10px 14px 12px;
+        box-shadow: 6px 7px 0 rgba(25,20,16,.16); }
+  .wb .marker { font-size: 15px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .wb .sub { font-family: "Caveat", cursive; font-size: 16px; line-height: 1.05; margin-top: 2px; opacity: .85; }
+
+  /* list rows (sign-next, batch wall) */
+  .row { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center;
+         border-top: 1.5px solid rgba(25,20,16,.22); padding: 10px 0; }
+  .c-night .row { border-top-color: rgba(244,237,225,.22); }
+  .row .avatar { width: 40px; height: 40px; border-radius: 50%; background: #FAF7F0; border: 2px solid #191410;
+                 display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #191410; }
+  .row .nm { font-size: 17px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .row .sub { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .66; margin-top: 3px; }
+  .row .act { color: inherit; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-decoration: underline;
+              text-underline-offset: 3px; min-height: 44px; display: grid; align-items: center; }
+
+  /* studio */
+  .studio .canvas { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
+  .tray { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #FAF7F0; border-radius: 14px;
+          padding: 6px 12px 8px; color: #191410; box-shadow: 6px 7px 0 rgba(25,20,16,.16); border: 2px solid #191410; }
+  .tray .trow { display: flex; align-items: center; gap: 2px; }
+  .tool { width: 44px; height: 44px; display: grid; place-items: center; background: none; border: none; position: relative; }
+  .tool.on::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: 2px; height: 3px; border-radius: 2px; background: #191410; }
+  .inks { display: flex; gap: 8px; padding: 2px 0 0; }
+  .ink { width: 24px; height: 24px; border-radius: 50%; border: none; position: relative; }
+  .ink.on::after { content: ""; position: absolute; inset: -5px; border: 1.5px solid #191410; border-radius: 50%; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+  .draft { font-size: 12.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+  .pub { display: flex; align-items: center; gap: 14px; }
+  .justsign { background: none; border: none; color: inherit; font-family: "Big Shoulders Display", sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; min-height: 44px; }
+  .publish { min-height: 50px; border: none; border-radius: 10px; background: #191410; color: #FAF7F0;
+    font-family: "Big Shoulders Display", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 0 24px; }
+  .c-night .publish { background: #F4EDE1; color: #191410; }
+
+  /* storyboard strip */
+  .strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .frame { background: #FAF7F0; border: 2px solid #191410; border-radius: 10px; padding: 8px 6px 6px;
+           display: grid; place-items: center; box-shadow: 5px 6px 0 rgba(25,20,16,.14); }
+  .frame figcaption { grid-row: 2; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+                      opacity: .7; padding-top: 5px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ═════ 1 · SHIRT · marigold (refined anchor: № stamp + dye wash) ═════ -->
+<section class="screen c" data-name="c3-shirt-marigold" data-chrome="none" data-time="17:10">
+  <div class="weave"></div>
+  <div class="dye"></div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="eyebrow">CSE · CLASS OF 2026 · MARIGOLD</div>
+      <div class="live"><i></i>3 HERE NOW</div>
+    </div>
+
+    <h1 class="poster">Ishita<br>Bansal</h1>
+    <p class="status">24 marks · 17 friends · shirt 1 of 2</p>
+    <p class="meta" style="margin-top:4px">№ 24 · Kabir signed the collar · 2h ago</p>
+
+    <div class="studio canvas" style="position:relative">
+      <div class="wallnote" style="left:0; top:14px; transform:rotate(-5deg)">still owe you for the DX lab<span>KABIR</span></div>
+      <div class="wallnote" style="right:6px; top:0; transform:rotate(4deg)">frontend queen, never change<span>MEGHNA</span></div>
+      <div class="wallnote" style="left:0; bottom:10px; transform:rotate(3deg)">who finishes your sentences now<span>ARJUN</span></div>
+      <svg class="shirt" width="292" height="410" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g opacity=".6" stroke="#4A3A20" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#4A3A20" style="color:#4A3A20" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+          <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px"><div class="tab on">FRONT</div><div class="tab">BACK</div></div>
+      <div class="zones">collar 4 · body 16 · hem 4</div>
+    </div>
+    <div class="ctas" style="margin-top:12px">
+      <button class="primary">Sign this shirt</button>
+      <button class="pill">Share her link</button>
+    </div>
+  </div>
+  <div class="bottom" data-float>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═════ 2 · SHIRT · cobalt (the field system: another owner) ═════ -->
+<section class="screen c c-cobalt" data-name="c3-shirt-cobalt" data-chrome="none" data-time="17:11">
+  <div class="weave"></div>
+  <div class="dye"></div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="eyebrow">CSE · CLASS OF 2026 · COBALT</div>
+      <div class="live"><i></i>5 HERE NOW</div>
+    </div>
+
+    <h1 class="poster">Devang<br>Rathore</h1>
+    <p class="status">41 marks · 26 friends · shirt 1 of 1</p>
+    <p class="meta" style="margin-top:4px">№ 41 · Meghna signed the hem · just now</p>
+
+    <div class="studio canvas" style="position:relative">
+      <div class="wallnote" style="left:0; top:14px; transform:rotate(-4deg)">pichakari champion, 4 years running<span>ISHITA</span></div>
+      <div class="wallnote" style="right:6px; top:0; transform:rotate(5deg)">captain. obviously.<span>MAYANK</span></div>
+      <div class="wallnote" style="left:2px; bottom:8px; transform:rotate(3deg)">return the charger. final warning<span>NIKITA</span></div>
+      <svg class="shirt" width="292" height="410" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g opacity=".5" stroke="#2A3A5C" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M240 240 c-8 -10 -24 -2 -18 8 c4 8 16 10 16 10 c0 0 13 -2 17 -10 c5 -11 -9 -17 -15 -8"/>
+          <path d="M140 260 C160 248 186 262 198 282"/>
+        </g>
+        <g fill="#2A3A5C" style="color:#2A3A5C" font-family="Caveat" font-size="30">
+          <text x="140" y="352" transform="rotate(-4 140 352)">bon voyage</text>
+          <text x="188" y="452" transform="rotate(4 188 452)">D-11</text>
+        </g>
+        <path d="M232 470 C250 456 268 480 284 462 C296 448 306 466 298 478" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px"><div class="tab on">FRONT</div><div class="tab">BACK</div></div>
+      <div class="zones">collar 9 · body 24 · hem 8</div>
+    </div>
+    <div class="ctas" style="margin-top:12px">
+      <button class="primary">Sign this shirt</button>
+      <button class="pill">Share his link</button>
+    </div>
+  </div>
+  <div class="bottom" data-float>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═════ 3 · SHIRT · ink field (night mode: the field deepened) ═════ -->
+<section class="screen c c-night" data-name="c3-shirt-night" data-chrome="none" data-time="23:12">
+  <div class="weave" style="opacity:.04"></div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="eyebrow">CSE · CLASS OF 2026 · MARIGOLD</div>
+      <div class="live"><i></i>1 HERE NOW</div>
+    </div>
+
+    <h1 class="poster">Ishita<br>Bansal</h1>
+    <p class="status" style="opacity:.95">24 marks · 17 friends · shirt 1 of 2</p>
+    <p class="meta" style="margin-top:4px;opacity:.7">№ 24 · Kabir signed the collar · 2h ago</p>
+
+    <div class="studio canvas" style="position:relative">
+      <div class="wallnote" style="left:0; top:14px; transform:rotate(-5deg)">still owe you for the DX lab<span>KABIR</span></div>
+      <div class="wallnote" style="right:6px; top:0; transform:rotate(4deg)">frontend queen, never change<span>MEGHNA</span></div>
+      <svg class="shirt" width="292" height="410" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#0E0C0A" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#0E0C0A" stroke-width="3.5"/>
+        <g opacity=".55" stroke="#6E5C3F" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#5F5138" style="color:#5F5138" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+          <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px"><div class="tab on">FRONT</div><div class="tab">BACK</div></div>
+      <div class="zones">collar 4 · body 16 · hem 4</div>
+    </div>
+    <div class="ctas" style="margin-top:12px">
+      <button class="primary">Sign this shirt</button>
+      <button class="pill">Share her link</button>
+    </div>
+  </div>
+  <div class="bottom" data-float>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═════ 4 · HOME · the field as home ground ═════ -->
+<section class="screen c" data-name="c3-home" data-chrome="none" data-time="17:20">
+  <div class="weave"></div>
+  <div class="dye"></div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="eyebrow">CSE · CLASS OF 2026</div>
+      <div class="live"><i></i>31 HERE NOW</div>
+    </div>
+
+    <h1 class="poster" style="font-size:44px">Your shirt,<br>Ishita</h1>
+    <p class="status">24 marks · 17 friends · 2 patches free on the back</p>
+    <p class="meta" style="margin-top:4px">№ 24 LANDED 2H AGO</p>
+
+    <div class="wb" style="margin-top:14px">
+      <div class="marker">SIGNING CLOSES IN 26 DAYS</div>
+      <div class="sub">shirts seal on 31 Oct · the yearbook opens at convocation</div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="meta" style="opacity:.7">SIGN NEXT · ONLINE NOW</div>
+      <div style="margin-top:2px">
+        <div class="row">
+          <div class="avatar">DR</div>
+          <div><div class="nm">Devang Rathore</div><div class="sub">field · cobalt · 41 marks</div></div>
+          <div class="act">SIGN</div>
+        </div>
+        <div class="row">
+          <div class="avatar">PN</div>
+          <div><div class="nm">Priya Nair</div><div class="sub">field · forest · 18 marks</div></div>
+          <div class="act">SIGN</div>
+        </div>
+        <div class="row">
+          <div class="avatar">MK</div>
+          <div><div class="nm">Mayank Kohli</div><div class="sub">field · oxblood · 33 marks</div></div>
+          <div class="act">SIGN</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="meta" style="opacity:.66">YESTERDAY · 5 MARKS LANDED</div>
+      <p class="status" style="font-size:14.5px; margin-top:2px; opacity:.85">Priya, Kabir, Sana and 2 more came by your wall.</p>
+    </div>
+    <div class="ctas" style="margin-top:auto; padding-top:14px">
+      <button class="primary">Share your link</button>
+      <button class="pill">Who hasn't signed me yet</button>
+    </div>
+  </div>
+  <div class="bottom" data-float>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═════ 5 · EXPLORE · the batch wall ═════ -->
+<section class="screen c" data-name="c3-explore" data-chrome="none" data-time="17:22">
+  <div class="weave"></div>
+  <div class="wrap">
+    <div class="eyebrow">CSE · CLASS OF 2026 · 312 SHIRTS</div>
+    <h1 class="poster" style="font-size:40px">The batch wall</h1>
+
+    <div style="margin-top:10px; border-bottom:2px solid #191410; padding-bottom:7px; display:flex; align-items:baseline; justify-content:space-between">
+      <span style="font-family:'Caveat',cursive; font-size:20px">type a name…</span>
+      <span class="meta" style="opacity:.6">A · B · C</span>
+    </div>
+
+    <div style="margin-top:6px">
+      <div class="row">
+        <div class="avatar">IB</div>
+        <div><div class="nm">Ishita Bansal</div><div class="sub">field · marigold · 2 free patches</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">DR</div>
+        <div><div class="nm">Devang Rathore</div><div class="sub">field · cobalt · online now</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">PN</div>
+        <div><div class="nm">Priya Nair</div><div class="sub">field · forest · 18 marks</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">MK</div>
+        <div><div class="nm">Mayank Kohli</div><div class="sub">field · oxblood · online now</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">SM</div>
+        <div><div class="nm">Sana Mirza</div><div class="sub">field · ink · 9 marks</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">AM</div>
+        <div><div class="nm">Arjun Mehta</div><div class="sub">field · forest · 27 marks</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">KS</div>
+        <div><div class="nm">Kabir Sethi</div><div class="sub">field · marigold · online now</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">TB</div>
+        <div><div class="nm">Tanya Bhatt</div><div class="sub">field · cobalt · 12 marks</div></div>
+        <div class="act">SIGN</div>
+      </div>
+      <div class="row">
+        <div class="avatar">RI</div>
+        <div><div class="nm">Rohan Iyer</div><div class="sub">field · oxblood · 2 free patches</div></div>
+        <div class="act">SIGN</div>
+      </div>
+    </div>
+
+    <div class="wb" style="margin-top:10px">
+      <div class="marker">NOT SIGNED YET? START WITH YOUR BENCH</div>
+      <div class="sub">the wall sorts by who's online right now</div>
+    </div>
+  </div>
+  <div class="bottom" data-float>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═════ 6 · LANDING · the front door in House Colours ═════ -->
+<section class="screen c" data-name="c3-landing" data-chrome="none" data-time="17:30">
+  <div class="weave"></div>
+  <div class="dye"></div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="eyebrow" style="font-size:15px; letter-spacing:.24em">SCRIBBL</div>
+      <div class="act" style="font-size:12px">SIGN IN</div>
+    </div>
+
+    <h1 class="poster" style="font-size:58px; margin-top:22px">Wear the shirt.<br>Let everyone<br>sign it.</h1>
+    <p class="status" style="font-size:15.5px; margin-top:10px; max-width:30ch">The last-day scribble ritual, for the class of 2026. One month. Then it becomes the yearbook.</p>
+
+    <div class="wb" style="margin-top:16px">
+      <div class="marker">312 SHIRTS CLAIMED</div>
+      <div class="sub">signing closes 31 Oct · 26 days left</div>
+    </div>
+
+    <svg width="240" height="220" viewBox="0 0 400 600" style="margin: 8px auto 0;" aria-hidden="true">
+      <g transform="rotate(-3 200 300)">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="6"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g fill="#4A3A20" style="color:#4A3A20" font-family="Caveat" font-size="30">
+          <text x="142" y="240" transform="rotate(-3 142 240)">bon voyage</text>
+          <text x="170" y="330" transform="rotate(3 170 330)">2026 forever</text>
+          <text x="136" y="420" transform="rotate(-2 136 420)">hostel 7</text>
+        </g>
+        <g opacity=".7" stroke="#4A3A20" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 190 C166 178 192 192 204 212"/>
+          <path d="M204 212 l-11 -6 M204 212 l-12 2"/>
+          <path d="M236 300 c-8 -10 -24 -2 -18 8 c4 8 16 10 16 10 c0 0 13 -2 17 -10 c5 -11 -9 -17 -15 -8"/>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </g>
+    </svg>
+
+    <div class="ctas" style="margin-top:auto">
+      <button class="primary">Claim your shirt</button>
+      <button class="pill">Peek at the yearbook</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═════ 7 · SIGNING · studio with bottom tray (thumb zone) ═════ -->
+<section class="screen c studio" data-name="c3-signing" data-chrome="none" data-time="17:34">
+  <div class="weave"></div>
+  <div class="wrap" style="padding-bottom:20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <h1 class="poster" style="font-size:30px">Signing Ishita's shirt</h1>
+      <div class="live" style="margin-top:6px"><i></i>3 HERE NOW</div>
+    </div>
+
+    <div class="studio canvas" style="margin-top:6px">
+      <div aria-hidden="true" style="position:absolute; left:4px; top:4px; right:4px; bottom:4px; overflow:hidden; border-radius:14px;">
+        <svg width="100%" height="100%" viewBox="0 0 390 620" preserveAspectRatio="xMidYMid slice">
+          <g opacity=".12" fill="none" stroke="#191410" stroke-width="4" stroke-linecap="round">
+            <path d="M52 110 C66 86 102 82 110 106 C116 124 90 132 84 118"/>
+            <path d="M310 480 C340 458 366 480 354 504"/>
+            <path d="M62 540 c-8 -10 -24 -2 -18 8 c4 8 16 10 16 10 c0 0 13 -2 17 -10 c5 -11 -9 -17 -15 -8"/>
+          </g>
+          <g opacity=".12" fill="#191410" font-family="Caveat" font-size="26">
+            <text x="150" y="80" transform="rotate(4 150 80)">2011 batch trips</text>
+            <text x="40" y="170" transform="rotate(-6 40 170)">hostel 7 forever</text>
+          </g>
+        </svg>
+      </div>
+      <svg class="shirt" width="312" height="438" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g opacity=".6" stroke="#4A3A20" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#4A3A20" style="color:#4A3A20" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+        </g>
+        <path d="M170 260 C186 246 210 276 226 258 C238 244 250 262 244 272" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="tray">
+      <div class="trow">
+        <button class="tool on" aria-label="Pen"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L20 6.5 17.5 4 5 16.5 4 20z"/></svg></button>
+        <button class="tool" aria-label="Marker"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-4 5h8l-1-2"/><path d="M12 15l6.5-9.5a2 2 0 0 0-3-2.5L9 12"/></svg></button>
+        <button class="tool" aria-label="Highlighter"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 4l4 4-8 10H6v-4z"/><path d="M4 21h9"/></svg></button>
+        <button class="tool" aria-label="Sticker"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/></svg></button>
+        <button class="tool" aria-label="Text"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
+        <button class="tool" aria-label="Undo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a6 6 0 0 1 0 12h-3"/></svg></button>
+      </div>
+      <div class="inks" data-system="ink-tray">
+        <button class="ink" data-hit-expanded style="background:#2D2923" aria-label="Ink black"></button>
+        <button class="ink on" data-hit-expanded style="background:#C43A2E" aria-label="Ink red"></button>
+        <button class="ink" data-hit-expanded style="background:#2563EB" aria-label="Ink blue"></button>
+        <button class="ink" data-hit-expanded style="background:#5F8B48" aria-label="Ink green"></button>
+        <button class="ink" data-hit-expanded style="background:#7C3AED" aria-label="Ink purple"></button>
+        <button class="ink" data-hit-expanded style="background:#EA580C" aria-label="Ink orange"></button>
+        <button class="ink" data-hit-expanded style="background:#0891B2" aria-label="Ink teal"></button>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="draft">Draft · 20s ago</div>
+      <div class="pub">
+        <button class="justsign">Just sign</button>
+        <button class="publish">Publish</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════ 8 · SIGNATURE MOMENT · "the shirt fills" storyboard ═════ -->
+<section class="screen c" data-name="c3-storyboard" data-chrome="none" data-time="17:36">
+  <div class="weave"></div>
+  <div class="wrap">
+    <div class="eyebrow">SIGNATURE MOMENT · ONE STORYBOARD</div>
+    <h1 class="poster" style="font-size:36px">The shirt fills</h1>
+    <p class="status" style="font-size:15px; max-width:32ch">Publish a mark and the ink soaks in. The field deepens one step. Everyone in the room sees the colour ripen.</p>
+
+    <div class="strip">
+      <figure class="frame" style="margin:0">
+        <svg width="86" height="120" viewBox="0 0 200 280">
+          <path d="M75 32 C84 46 116 46 125 32 L161 48 C168 51 171 58 168 65 L155 97 L143 90 L143 248 C143 253 139 257 134 257 L66 257 C61 257 57 253 57 248 L57 90 L45 97 L32 65 C29 58 32 51 39 48 Z"
+                fill="#FAF7F0" stroke="#191410" stroke-width="4"/>
+          <path d="M96 150 C104 143 116 158 124 149" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+        <figcaption>1 · MARK LANDS WET</figcaption>
+      </figure>
+      <figure class="frame" style="margin:0">
+        <svg width="86" height="120" viewBox="0 0 200 280">
+          <path d="M75 32 C84 46 116 46 125 32 L161 48 C168 51 171 58 168 65 L155 97 L143 90 L143 248 C143 253 139 257 134 257 L66 257 C61 257 57 253 57 248 L57 90 L45 97 L32 65 C29 58 32 51 39 48 Z"
+                fill="#FAF7F0" stroke="#191410" stroke-width="4"/>
+          <path d="M96 150 C104 143 116 158 124 149" fill="none" stroke="#9E2F26" stroke-width="6" stroke-linecap="round"/>
+          <path d="M97 153 C104 147 114 158 121 152" fill="none" stroke="#9E2F26" stroke-width="9" stroke-linecap="round" opacity=".35"/>
+        </svg>
+        <figcaption>2 · INK SOAKS, 600MS</figcaption>
+      </figure>
+      <figure class="frame" style="margin:0">
+        <svg width="86" height="120" viewBox="0 0 200 280">
+          <rect width="200" height="280" rx="8" fill="#DD911F"/>
+          <path d="M75 32 C84 46 116 46 125 32 L161 48 C168 51 171 58 168 65 L155 97 L143 90 L143 248 C143 253 139 257 134 257 L66 257 C61 257 57 253 57 248 L57 90 L45 97 L32 65 C29 58 32 51 39 48 Z"
+                fill="#FAF7F0" stroke="#191410" stroke-width="4"/>
+          <path d="M96 150 C104 143 116 158 124 149" fill="none" stroke="#9E2F26" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+        <figcaption>3 · FIELD DEEPENS · № 25</figcaption>
+      </figure>
+    </div>
+
+    <div class="wb" style="margin-top:16px">
+      <div class="marker">ISHITA'S FIELD · STEP 7 OF 10</div>
+      <div class="sub">three more marks and the marigold is fully ripe</div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="meta" style="opacity:.7; margin-bottom:6px">HAPTIC · REDUCED MOTION</div>
+      <p class="status" style="font-size:14.5px; max-width:34ch">One tick when the mark sets. With reduced motion, the mark arrives settled and the field updates on the next render.</p>
+    </div>
+  </div>
+</section>
+
+<script src="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.js"></script>
+</body>
+</html>

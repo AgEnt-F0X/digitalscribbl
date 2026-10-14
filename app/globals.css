@@ -287,7 +287,6 @@
     @apply absolute rounded-2xl border px-4 py-3 font-display text-base leading-6 shadow-sticker;
     border-color: rgba(45, 41, 35, 0.14);
     filter: drop-shadow(0 8px 12px rgba(45, 35, 22, 0.10));
-    background: #fff;
     transition: filter 180ms ease-out, transform 180ms ease-out;
   }
   .sticker-note:hover {
@@ -380,10 +379,29 @@
 
   /* ── Floating CTA (the + Sign button in center of bottom nav) ─── */
   .nav-fab {
-    @apply h-14 w-14 -mt-6 rounded-full bg-brand text-white grid place-items-center shadow-paper-deep transition;
+    @apply h-14 w-14 -mt-6 text-white grid place-items-center shadow-paper-deep transition;
+    --pencil-shade-strength: 4%;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0)),
+      repeating-linear-gradient(
+        -12deg,
+        rgba(255, 255, 255, calc(var(--pencil-shade-strength) / 100 * 1.5)) 0 2px,
+        transparent 2px 8px
+      ),
+      var(--brand);
+    border: 1.5px solid var(--brand-hover);
+    border-radius: 18px 16px 20px 15px;
+    transition:
+      --pencil-shade-strength 200ms ease-out,
+      border-color 200ms ease-out,
+      transform 100ms ease-out;
+  }
+  .nav-fab:hover {
+    --pencil-shade-strength: 18%;
   }
   .nav-fab:active {
-    @apply scale-95;
+    --pencil-shade-strength: 28%;
+    transform: scale(0.95) translateY(1px);
   }
 }
 

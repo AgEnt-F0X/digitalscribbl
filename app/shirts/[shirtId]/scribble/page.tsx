@@ -7,15 +7,18 @@ import type { ScribbleRow } from '@/lib/supabase/types'
 
 interface Props {
   params: Promise<{ shirtId: string }>
+  searchParams: Promise<{ side?: string }>
 }
 
 export const dynamic = 'force-dynamic'
 
 type PermissionState = 'can' | 'request' | 'locked' | 'own'
 
-export default async function ShirtScribblePage({ params }: Props) {
+export default async function ShirtScribblePage({ params, searchParams }: Props) {
   const { supabase, user } = await requirePageUser()
   const { shirtId } = await params
+  const { side } = await searchParams
+  const initialSide = side === 'back' ? 'back' : 'front'
 
   const { data: shirt } = await supabase
     .from('shirts')
@@ -85,6 +88,7 @@ export default async function ShirtScribblePage({ params }: Props) {
       currentUserId={user.id}
       currentUserName={viewerProfile?.display_name ?? 'You'}
       permissionState={permissionState}
+      initialSide={initialSide}
       ownerAvatarConfig={ownerAvatarConfig}
       existingScribbles={(scribbles ?? []) as Pick<ScribbleRow, 'id' | 'x' | 'y' | 'w' | 'h' | 'canvas_svg' | 'panel'>[]}
     />

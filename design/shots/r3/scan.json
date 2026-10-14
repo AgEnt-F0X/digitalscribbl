@@ -1,0 +1,248 @@
+[
+  {
+    "name": "c3-shirt-marigold",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 17,
+        "Caveat": 5
+      },
+      "sizes": [
+        56,
+        30,
+        19,
+        16.5,
+        16,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        0,
+        48
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-shirt-cobalt",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 17,
+        "Caveat": 5
+      },
+      "sizes": [
+        56,
+        30,
+        19,
+        16.5,
+        16,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-shirt-night",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 16,
+        "Caveat": 4
+      },
+      "sizes": [
+        56,
+        30,
+        19,
+        16.5,
+        16,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-home",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 27,
+        "Caveat": 1
+      },
+      "sizes": [
+        44,
+        19,
+        17,
+        16,
+        15,
+        14.5,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-explore",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 28,
+        "Caveat": 2
+      },
+      "sizes": [
+        40,
+        20,
+        17,
+        16,
+        15,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-landing",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 7,
+        "Caveat": 4
+      },
+      "sizes": [
+        58,
+        30,
+        19,
+        16,
+        15.5,
+        15,
+        12
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 2,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c3-signing",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 5,
+        "Caveat": 3
+      },
+      "sizes": [
+        30,
+        26,
+        17,
+        15,
+        12.5
+      ],
+      "weights": [
+        "400",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        0,
+        48
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "c3-storyboard",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 9,
+        "Caveat": 1
+      },
+      "sizes": [
+        36,
+        16,
+        15,
+        14.5,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 3,
+      "accentHues": [
+        0,
+        48
+      ],
+      "cards": 0
+    }
+  }
+]

@@ -1,0 +1,105 @@
+[
+  {
+    "name": "m1-shirt",
+    "fails": [],
+    "warns": [
+      "9 distinct text sizes. A type scale has 5 to 7 steps: 40, 30, 28, 18, 15, 13, 12, 11.5, 11"
+    ],
+    "facts": {
+      "fonts": {
+        "IBM Plex Mono": 22,
+        "Caveat": 6
+      },
+      "sizes": [
+        40,
+        30,
+        28,
+        18,
+        15,
+        13,
+        12,
+        11.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        24
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "g1-shirt",
+    "fails": [],
+    "warns": [
+      "Three saturated hue families (0°, 48°, 24°). Is each one earning its place?"
+    ],
+    "facts": {
+      "fonts": {
+        "Baloo 2": 17,
+        "Caveat": 5
+      },
+      "sizes": [
+        44,
+        30,
+        18,
+        17,
+        15,
+        12.5,
+        11.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        0,
+        48,
+        24
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "d1-shirt",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Bricolage Grotesque": 18,
+        "Caveat": 3
+      },
+      "sizes": [
+        30,
+        21,
+        19,
+        18,
+        15,
+        12.5,
+        11.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        0
+      ],
+      "cards": 2
+    }
+  }
+]

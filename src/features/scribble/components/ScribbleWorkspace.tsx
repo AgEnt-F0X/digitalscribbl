@@ -1,6 +1,6 @@
 'use client'
 
-import type { Ref } from 'react'
+import type { RefObject } from 'react'
 import type { DrawingCanvasRef, DrawingTool } from '@/components/scribble/DrawingCanvas'
 import type { UserAvatarConfig } from '@/src/features/avatar/types'
 import type { CanvasMode, OutsideNote, OutsideStickerReaction, ShirtSide } from '../types'
@@ -22,7 +22,7 @@ interface ScribbleWorkspaceProps {
   onMode: (mode: CanvasMode) => void
   side: ShirtSide
   onSide: (side: ShirtSide) => void
-  drawingRef: Ref<DrawingCanvasRef>
+  drawingRef: RefObject<DrawingCanvasRef>
   drawingTool: DrawingTool
   color: string
   brushSize: number
@@ -46,6 +46,8 @@ interface ScribbleWorkspaceProps {
   outsideReactions: OutsideStickerReaction[]
   selectedObject: SelectedOutsideObject
   onSelectObject: (object: SelectedOutsideObject) => void
+  onUpdateOutsideNote?: (id: string, patch: Partial<OutsideNote>) => void
+  onUpdateOutsideReaction?: (id: string, patch: Partial<OutsideStickerReaction>) => void
   zoom: number
   onZoom: (zoom: number) => void
   /**
@@ -79,12 +81,19 @@ export default function ScribbleWorkspace({
   outsideReactions,
   selectedObject,
   onSelectObject,
+  onUpdateOutsideNote,
+  onUpdateOutsideReaction,
   zoom,
   onZoom,
   variant = 'desktop',
 }: ScribbleWorkspaceProps) {
   const sideScribbles = existingScribbles.filter(scribble => scribble.panel === side)
   const isMobile = variant === 'mobile'
+
+  // Pan/pinch interrupts an in-progress stroke; drawing resumes when the
+  // gesture ends. Keeps one-finger-draws / two-fingers-pan honest.
+  const handleGestureStart = () => drawingRef.current?.cancelActiveStroke()
+  const handleGestureEnd = () => drawingRef.current?.resumeDrawing()
 
   const canvas = activeMode === 'shirt' ? (
     <FlatShirtCanvas
@@ -112,6 +121,8 @@ export default function ScribbleWorkspace({
       reactions={outsideReactions}
       selectedObject={selectedObject}
       onSelect={onSelectObject}
+      onUpdateNote={onUpdateOutsideNote}
+      onUpdateReaction={onUpdateOutsideReaction}
     />
   )
 
@@ -129,7 +140,13 @@ export default function ScribbleWorkspace({
           The ZoomViewport adds pinch + drag interactions on top of the canvas
           without ever touching the Fabric coordinate space underneath.
         */}
-        <ZoomViewport zoom={zoom} onZoom={onZoom} className="mx-auto w-full max-w-[40vh]">
+        <ZoomViewport
+          zoom={zoom}
+          onZoom={onZoom}
+          onGestureStart={handleGestureStart}
+          onGestureEnd={handleGestureEnd}
+          className="mx-auto w-full max-w-[40vh]"
+        >
           {canvas}
         </ZoomViewport>
       </section>
@@ -153,7 +170,12 @@ export default function ScribbleWorkspace({
         </div>
       </div>
 
-      <ZoomViewport zoom={zoom} onZoom={onZoom}>
+      <ZoomViewport
+        zoom={zoom}
+        onZoom={onZoom}
+        onGestureStart={handleGestureStart}
+        onGestureEnd={handleGestureEnd}
+      >
         {canvas}
       </ZoomViewport>
     </section>

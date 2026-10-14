@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scribbl — three directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Big+Shoulders+Display:wght@100..900&family=Caveat:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.css">
+<style>
+  /* ------------------------------------------------------------- shared */
+  .screen { font-size: 16px; }
+  .ink-mark { font-family: "Caveat", cursive; }
+  .tap { min-height: 48px; }
+  svg { display: block; }
+
+  /* ------------------------------------------------------------- A — THE LAST NIGHT */
+  .a { background: #161310; color: #F4EDE1; font-family: "Archivo", sans-serif; }
+  .a .lamp { position: absolute; inset: 0;
+    background: radial-gradient(ellipse 130% 46% at 50% -6%, rgba(255,214,150,.14), rgba(255,214,150,0) 62%); }
+  .a .wrap { position: absolute; inset: 0; padding: 18px 20px 88px; display: flex; flex-direction: column; }
+  .a .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .a .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: #B7AA94; }
+  .a .live { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: #F4EDE1;
+    background: rgba(244,237,225,.08); border: 1px solid rgba(244,237,225,.14); border-radius: 999px; padding: 7px 12px; }
+  .a .live i { width: 7px; height: 7px; border-radius: 50%; background: #E8453C; }
+  .a .stage { flex: 1; display: grid; place-items: center; min-height: 0; }
+  .a .name { font-weight: 800; font-stretch: 125%; font-size: 34px; letter-spacing: -.015em; line-height: 1.02; text-transform: uppercase; margin: 0; }
+  .a .status { margin: 6px 0 0; font-size: 15px; color: #B7AA94; }
+  .a .fresh { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12.5px; color: #B7AA94; }
+  .a .fresh i { width: 7px; height: 7px; border-radius: 50%; background: #E8453C; }
+  .a .notes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .a .note { background: #211C17; border: 1px solid rgba(244,237,225,.09); border-radius: 10px; padding: 10px 10px 8px; }
+
+  .a .note em { display: block; font-family: "Caveat", cursive; font-style: normal; font-size: 15px; line-height: 1.1; color: #F4EDE1; }
+  .a .note span { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #B7AA94; }
+  .a .tabs { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .a .tab { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; color: #B7AA94; padding: 6px 2px 8px; }
+  .a .tab.on { color: #F4EDE1; box-shadow: inset 0 -2.5px 0 #E8453C; }
+  .a .zones { font-size: 11px; color: #B7AA94; font-variant-numeric: tabular-nums; }
+  .a .ctas { margin-top: 12px; }
+  .a .primary { width: 100%; min-height: 52px; border: none; border-radius: 14px; background: #D63830; color: #FFF6F2;
+    font-family: "Archivo", sans-serif; font-size: 19px; font-weight: 800; letter-spacing: .01em; }
+  .a .quiet { display: block; width: 100%; text-align: center; margin-top: 10px; background: none; border: none;
+    font-family: "Archivo", sans-serif; color: #B7AA94; font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+  .a .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; display: grid; grid-template-columns: repeat(4, 1fr);
+    align-items: center; background: rgba(22,19,16,.82); backdrop-filter: blur(10px); border-top: 1px solid rgba(244,237,225,.08); }
+  .a .bitem { display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #B7AA94; }
+  .a .bitem.on { color: #F4EDE1; }
+
+  /* jersey (lit fabric) shared by A screens */
+
+
+  /* ------------------------------------------------------------- B — THE ANNUAL */
+  .b { background: #ECEAE4; color: #211E19; font-family: "Newsreader", serif; }
+  .b .wrap { position: absolute; inset: 0; padding: 18px 22px 92px; display: flex; flex-direction: column; }
+  .b .folio { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #D9D6CD; padding-bottom: 9px; }
+  .b .mast { font-size: 11px; font-weight: 700; letter-spacing: .22em; }
+  .b .iss { font-size: 12.5px; font-style: italic; color: #6F695E; }
+  .b h1 { font-size: 38px; font-weight: 600; line-height: 1.04; letter-spacing: -.01em; margin: 14px 0 0; }
+  .b h1 em { font-style: italic; font-weight: 500; }
+  .b .status { margin: 7px 0 0; font-size: 15px; color: #6F695E; }
+  .b .plate { margin-top: 12px; border: 1px solid #D9D6CD; background: #F8F7F3; padding: 14px 12px 10px; position: relative; }
+  .b .plate .fig { position: absolute; top: 9px; left: 12px; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #6F695E; }
+  .b .plate .stamp { position: absolute; top: 8px; right: 10px; border: 1.5px solid #2A4B8D; color: #2A4B8D;
+    font-size: 11px; font-weight: 700; letter-spacing: .12em; padding: 3px 7px; transform: rotate(2deg); }
+  .b .cap { margin-top: 8px; font-size: 11px; color: #6F695E; font-style: italic; }
+  .b .fn { margin-top: 12px; }
+  .b .fn .row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: baseline;
+    border-top: 1px solid #D9D6CD; padding: 7px 0; }
+  .b .fn .no { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #6F695E; font-variant-numeric: tabular-nums; }
+  .b .fn em { font-family: "Caveat", cursive; font-style: normal; font-size: 17px; line-height: 1.05; }
+  .b .fn span { color: #6F695E; font-size: 12.5px; font-style: italic; }
+  .b .tabs { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; border-bottom: 1px solid #D9D6CD; }
+  .b .tab { font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #6F695E; padding-bottom: 8px; }
+  .b .tab.on { color: #211E19; box-shadow: inset 0 -2.5px 0 #2A4B8D; }
+  .b .zones { font-size: 12px; color: #6F695E; font-variant-numeric: tabular-nums; }
+  .b .ctas { margin-top: 12px; display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .b .primary { min-height: 52px; border: none; border-radius: 0; background: #2A4B8D; color: #F8F7F3;
+    font-family: "Newsreader", serif; font-size: 18px; font-weight: 600; }
+  .b .quiet { background: none; border: none; color: #211E19; font-family: "Newsreader", serif; font-size: 15px;
+    font-style: italic; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+  .b .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: grid; grid-template-columns: repeat(4, 1fr);
+    align-items: center; background: #ECEAE4; border-top: 1px solid #D9D6CD; }
+  .b .bitem { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #6F695E; }
+  .b .bitem.on { color: #2A4B8D; }
+
+  /* ------------------------------------------------------------- C — HOUSE COLOURS */
+  .c { background: #E29A2E; color: #191410; font-family: "Big Shoulders Display", sans-serif; }
+  .c .weave { position: absolute; inset: 0; opacity: .05;
+    background: repeating-linear-gradient(0deg, #191410 0 1px, transparent 1px 4px),
+                repeating-linear-gradient(90deg, #191410 0 1px, transparent 1px 4px); }
+  .c .wrap { position: absolute; inset: 0; padding: 20px 20px 84px; display: flex; flex-direction: column; }
+  .c .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .c .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .2em; color: #4A3A20; }
+  .c .live { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: #191410; }
+  .c .live i { width: 8px; height: 8px; border-radius: 50%; background: #191410; }
+  .c h1 { font-size: 56px; font-weight: 800; line-height: .92; letter-spacing: -.005em; text-transform: uppercase; margin: 12px 0 0; }
+  .c .status { margin: 8px 0 0; font-size: 16px; font-weight: 600; }
+  .c .fresh { margin: 5px 0 0; font-family: "Big Shoulders Display", sans-serif; font-size: 12.5px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: #4A3A20; }
+  .c .stage { flex: 1; display: grid; place-items: center; min-height: 0; }
+  .c .stage svg { filter: drop-shadow(9px 10px 0 rgba(25,20,16,.16)); }
+  .c .wallnote { position: absolute; font-family: "Caveat", cursive; font-size: 16.5px; line-height: 1; color: #191410; }
+  .c .wallnote span { display: block; font-family: "Big Shoulders Display", sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: .14em; color: #4A3A20; margin-top: 2px; }
+  .c .tabs { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; }
+  .c .tab { font-size: 12.5px; font-weight: 700; letter-spacing: .12em; color: #4A3A20; padding-bottom: 7px; }
+  .c .tab.on { color: #191410; box-shadow: inset 0 -3px 0 #191410; }
+  .c .zones { font-size: 11px; font-weight: 600; color: #4A3A20; font-variant-numeric: tabular-nums; }
+  .c .ctas { margin-top: 12px; }
+  .c .primary { width: 100%; min-height: 54px; border: none; border-radius: 12px; background: #191410; color: #FAF7F0;
+    font-family: "Big Shoulders Display", sans-serif; font-size: 19px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .c .quiet { display: block; width: 100%; margin-top: 8px; min-height: 50px; background: transparent; border: 1.5px solid #191410;
+    border-radius: 12px; font-family: "Big Shoulders Display", sans-serif; color: #191410; font-size: 16px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .c .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; display: grid; grid-template-columns: repeat(4, 1fr);
+    align-items: center; border-top: 1.5px solid rgba(25,20,16,.28); }
+  .c .bitem { display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #4A3A20; }
+  .c .bitem.on { color: #191410; }
+
+  /* ------------------------------------------------------------- studio screens (shared skeleton) */
+  .studio .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .studio h2 { margin: 0; line-height: 1.05; }
+  .studio .canvas { flex: 1; min-height: 0; display: grid; place-items: center; margin-top: 12px; position: relative; }
+  .studio .rail { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); display: grid; gap: 4px; }
+  .studio .tool { width: 44px; height: 44px; display: grid; place-items: center; background: none; border: none; position: relative; }
+  .studio .tool.on::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 2px; height: 3px; border-radius: 2px; }
+  .studio .inks { display: flex; gap: 9px; align-items: center; justify-content: center; margin-top: 10px; }
+  .studio .ink { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; padding: 0; position: relative; }
+  .studio .ink.on { border-color: currentColor; }
+  .studio .ink.on::after { content: ""; position: absolute; inset: -6px; border: 1.5px solid currentColor; border-radius: 50%; opacity: .35; }
+  .studio .foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+  .studio .draft { font-size: 12px; }
+  .studio .pub { display: flex; align-items: center; gap: 14px; }
+
+  /* studio A */
+  .a.studio .canvas { background: #211C17; border: 1px solid rgba(244,237,225,.08); border-radius: 20px; padding-left: 40px; }
+  .a.studio .tool.on::after { background: #E8453C; }
+  .a.studio h2 { font-weight: 800; font-stretch: 125%; font-size: 21px; text-transform: uppercase; letter-spacing: -.01em; }
+  .a.studio .draft { color: #B7AA94; font-size: 12.5px; }
+  .a.studio .justsign { background: none; border: none; color: #F4EDE1; font-family: "Archivo", sans-serif;
+    font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+  .a.studio .publish { min-height: 52px; border: none; border-radius: 13px; background: #D63830; color: #FFF6F2;
+    font-family: "Archivo", sans-serif; font-size: 19px; font-weight: 800; padding: 0 26px; }
+  .a.studio .inks { color: #F4EDE1; }
+
+  /* studio B */
+  .b.studio .canvas { border: 1px solid #D9D6CD; background: #F8F7F3; padding-left: 40px; }
+  .b.studio .tool.on::after { background: #2A4B8D; }
+  .b.studio h2 { font-size: 24px; font-weight: 600; }
+  .b.studio h2 em { font-style: italic; }
+  .b.studio .draft { color: #6F695E; font-style: italic; }
+  .b.studio .justsign { background: none; border: none; color: #211E19; font-family: "Newsreader", serif;
+    font-size: 14.5px; font-style: italic; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+  .b.studio .publish { min-height: 52px; border: none; border-radius: 0; background: #2A4B8D; color: #F8F7F3;
+    font-family: "Newsreader", serif; font-size: 17px; font-weight: 600; padding: 0 26px; }
+  .b.studio .inks { color: #211E19; }
+
+  /* studio C */
+  .c.studio .canvas svg { filter: none; }
+  .c.studio .tool.on::after { background: #191410; }
+  .c.studio .rail { background: rgba(226,154,46,.9); border-radius: 12px; padding: 4px 0; }
+  .c.studio h2 { font-size: 27px; font-weight: 800; text-transform: uppercase; letter-spacing: .01em; }
+  .c.studio .draft { color: #4A3A20; font-size: 12.5px; }
+  .c.studio .justsign { background: none; border: none; color: #191410; font-family: "Big Shoulders Display", sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; min-height: 44px; }
+  .c.studio .publish { min-height: 52px; border: none; border-radius: 10px; background: #191410; color: #FAF7F0;
+    font-family: "Big Shoulders Display", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 0 26px; }
+  .c.studio .inks { color: #191410; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ A1 · THE LAST NIGHT — Ishita's shirt ══════════════════════════════ -->
+<section class="screen a" data-name="a1-shirt" data-chrome="none" data-time="23:40">
+  <div class="lamp"></div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="eyebrow">CSE · CLASS OF 2026</div>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <div class="stage">
+      <div class="jersey-lit">
+        <svg width="304" height="424" viewBox="0 0 400 600">
+          <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+                fill="#EFE6D6" stroke="#191410" stroke-width="4"/>
+          <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3"/>
+          <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+                fill="none" stroke="rgba(120,96,60,.25)" stroke-width="14" stroke-dasharray="2 14" stroke-linecap="round"/>
+          <!-- worn marks, one ink -->
+          <g opacity=".75" stroke="#6E5C3F" stroke-width="4" fill="none" stroke-linecap="round">
+            <path d="M146 214 C166 202 192 216 204 236"/>
+            <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+            <path d="M236 330 c-6 -8 -18 -2 -14 8 c3 7 14 9 14 9 c0 0 11 -2 14 -9 c4 -10 -8 -16 -14 -8"/>
+          </g>
+          <g fill="#5F5138" style="color:#5F5138" font-family="Caveat" font-size="30">
+            <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+            <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+            <text x="136" y="486" transform="rotate(-2 136 486)">R.</text>
+          </g>
+          <!-- fresh mark, wet: Kabir on the collar, 2h ago -->
+          <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#D63830" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="229" cy="101" r="2.6" fill="#D63830"/>
+          <circle cx="190" cy="104" r="2" fill="#D63830" opacity=".7"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1 class="name">Ishita<br>Bansal</h1>
+    <p class="status">23 marks from 17 friends · 2 patches free on the back</p>
+    <div class="fresh"><i></i>Kabir signed the collar · 2h ago</div>
+
+    <div class="notes">
+      <div class="note"><em>still owe you for the DX lab</em><span>KABIR</span></div>
+      <div class="note"><em>frontend queen, never change</em><span>MEGHNA</span></div>
+      <div class="note"><em>who finishes your sentences now</em><span>ARJUN</span></div>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px">
+        <div class="tab on">FRONT</div>
+        <div class="tab">BACK</div>
+      </div>
+      <div class="zones">collar 4 · body 15 · hem 4</div>
+    </div>
+
+    <div class="ctas">
+      <button class="primary tap">Sign this shirt</button>
+      <button class="quiet tap">Share her link</button>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Home</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>Explore</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Activity</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>Me</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ A2 · THE LAST NIGHT — signing ══════════════════════════════ -->
+<section class="screen a studio" data-name="a2-signing" data-chrome="none" data-time="23:44">
+  <div class="lamp"></div>
+  <div class="wrap">
+    <div class="head">
+      <h2>You're signing<br>Ishita's shirt</h2>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <div class="canvas">
+      <div class="rail">
+        <button class="tool on" aria-label="Pen"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L20 6.5 17.5 4 5 16.5 4 20z"/></svg></button>
+        <button class="tool" aria-label="Marker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-4 5h8l-1-2"/><path d="M12 15l6.5-9.5a2 2 0 0 0-3-2.5L9 12"/></svg></button>
+        <button class="tool" aria-label="Highlighter"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 4l4 4-8 10H6v-4z"/><path d="M4 21h9"/></svg></button>
+        <button class="tool" aria-label="Sticker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/></svg></button>
+        <button class="tool" aria-label="Text"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
+        <button class="tool" aria-label="Undo"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#F4EDE1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a6 6 0 0 1 0 12h-3"/></svg></button>
+      </div>
+
+      <svg width="284" height="400" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#EFE6D6" stroke="#191410" stroke-width="4"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3"/>
+        <g opacity=".75" stroke="#6E5C3F" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#5F5138" style="color:#5F5138" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+        </g>
+        <!-- your stroke going on now -->
+        <path d="M170 260 C186 246 210 276 226 258 C238 244 250 262 244 272" fill="none" stroke="#D63830" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="inks" data-system="ink-tray">
+      <button class="ink" data-hit-expanded style="background:#2D2923" aria-label="Ink black"></button>
+      <button class="ink on" data-hit-expanded style="background:#D63830" aria-label="Ink red"></button>
+      <button class="ink" data-hit-expanded style="background:#2563EB" aria-label="Ink blue"></button>
+      <button class="ink" data-hit-expanded style="background:#5F8B48" aria-label="Ink green"></button>
+      <button class="ink" data-hit-expanded style="background:#7C3AED" aria-label="Ink purple"></button>
+      <button class="ink" data-hit-expanded style="background:#EA580C" aria-label="Ink orange"></button>
+      <button class="ink" data-hit-expanded style="background:#D83F6B" aria-label="Ink pink"></button>
+      <button class="ink" data-hit-expanded style="background:#0891B2" aria-label="Ink teal"></button>
+    </div>
+
+    <div class="foot">
+      <div class="draft">Saved as draft · 20s ago</div>
+      <div class="pub">
+        <button class="justsign tap">Just sign</button>
+        <button class="publish tap">Publish</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ B1 · THE ANNUAL — Ishita's shirt ══════════════════════════════ -->
+<section class="screen b" data-name="b1-shirt" data-chrome="none" data-time="18:52">
+  <div class="wrap">
+    <div class="folio">
+      <div class="mast">SCRIBBL · THE ANNUAL</div>
+      <div class="iss">Class of 2026 · CSE</div>
+    </div>
+
+    <h1>Ishita Bansal, <em>her page</em></h1>
+    <p class="status">Twenty-four marks from seventeen friends. Two patches free on the back.</p>
+
+    <div class="plate">
+      <div class="fig">PLATE 1 · FRONT</div>
+      <div class="stamp">№ 24 · KABIR · 2H AGO</div>
+      <svg width="252" height="352" viewBox="0 0 400 600" style="margin: 6px auto 0;">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FFFFFF" stroke="#211E19" stroke-width="2.5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#211E19" stroke-width="1.5"/>
+        <g opacity=".75" stroke="#6E5C3F" stroke-width="3" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+          <path d="M236 330 c-6 -8 -18 -2 -14 8 c3 7 14 9 14 9 c0 0 11 -2 14 -9 c4 -10 -8 -16 -14 -8"/>
+        </g>
+        <g fill="#5F5138" style="color:#5F5138" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+          <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+          <text x="136" y="486" transform="rotate(-2 136 486)">R.</text>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#2A4B8D" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+      <div class="cap">Shirt no. 1, front. Marks are numbered in the order they were signed.</div>
+    </div>
+
+    <div class="fn">
+      <div class="row"><div class="no">№ 24</div><div><em>still owe you for the DX lab</em> <span>(Kabir, 2h ago)</span></div></div>
+      <div class="row"><div class="no">№ 23</div><div><em>frontend queen, never change</em> <span>(Meghna, Tue)</span></div></div>
+      <div class="row"><div class="no">№ 11</div><div><em>who finishes your sentences now</em> <span>(Arjun, 12 Oct)</span></div></div>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:22px">
+        <div class="tab on">FRONT</div>
+        <div class="tab">BACK</div>
+      </div>
+      <div class="zones">collar 4 · body 15 · hem 4</div>
+    </div>
+
+    <div class="ctas">
+      <button class="primary tap">Sign this shirt</button>
+      <button class="quiet tap">Share her link</button>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="bitem">HOME</div>
+    <div class="bitem">EXPLORE</div>
+    <div class="bitem">ACTIVITY</div>
+    <div class="bitem on">ME</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ B2 · THE ANNUAL — signing ══════════════════════════════ -->
+<section class="screen b studio" data-name="b2-signing" data-chrome="none" data-time="18:55">
+  <div class="wrap">
+    <div class="head">
+      <h2>You're signing Ishita's shirt. <em>№ 25 is yours.</em></h2>
+      <div class="live" style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#6F695E;white-space:nowrap;"><i style="width:7px;height:7px;border-radius:50%;background:#2A4B8D;"></i>3 here now</div>
+    </div>
+
+    <div class="canvas">
+      <div class="rail">
+        <button class="tool on" aria-label="Pen"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L20 6.5 17.5 4 5 16.5 4 20z"/></svg></button>
+        <button class="tool" aria-label="Marker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-4 5h8l-1-2"/><path d="M12 15l6.5-9.5a2 2 0 0 0-3-2.5L9 12"/></svg></button>
+        <button class="tool" aria-label="Highlighter"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 4l4 4-8 10H6v-4z"/><path d="M4 21h9"/></svg></button>
+        <button class="tool" aria-label="Sticker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/></svg></button>
+        <button class="tool" aria-label="Text"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
+        <button class="tool" aria-label="Undo"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#211E19" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a6 6 0 0 1 0 12h-3"/></svg></button>
+      </div>
+      <svg width="276" height="386" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FFFFFF" stroke="#211E19" stroke-width="2.5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#211E19" stroke-width="1.5"/>
+        <g opacity=".75" stroke="#6E5C3F" stroke-width="3" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#5F5138" style="color:#5F5138" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+        </g>
+        <path d="M170 260 C186 246 210 276 226 258 C238 244 250 262 244 272" fill="none" stroke="#2A4B8D" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="inks" data-system="ink-tray">
+      <button class="ink on" data-hit-expanded style="background:#211E19" aria-label="Ink black"></button>
+      <button class="ink" data-hit-expanded style="background:#2A4B8D" aria-label="Ink blue"></button>
+      <button class="ink" data-hit-expanded style="background:#5F8B48" aria-label="Ink green"></button>
+      <button class="ink" data-hit-expanded style="background:#D83F6B" aria-label="Ink pink"></button>
+      <button class="ink" data-hit-expanded style="background:#B8860B" aria-label="Ink ochre"></button>
+    </div>
+
+    <div class="foot">
+      <div class="draft">Draft saved · 20s ago</div>
+      <div class="pub">
+        <button class="justsign tap">Just sign</button>
+        <button class="publish tap">Publish</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ C1 · HOUSE COLOURS — Ishita's shirt ══════════════════════════════ -->
+<section class="screen c" data-name="c1-shirt" data-chrome="none" data-time="17:10">
+  <div class="weave"></div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="eyebrow">CSE · CLASS OF 2026 · MARIGOLD</div>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <h1>Ishita<br>Bansal</h1>
+    <p class="status">23 marks · 17 friends · shirt 1 of 2</p>
+    <p class="fresh">Kabir signed the collar, 2h ago</p>
+
+    <div class="stage" style="position:relative">
+      <div class="wallnote" style="left:0; top:8px; transform:rotate(-5deg)">still owe you for the DX lab<span>KABIR</span></div>
+      <div class="wallnote" style="right:14px; top:22px; transform:rotate(4deg)">frontend queen, never change<span>MEGHNA</span></div>
+      <div class="wallnote" style="left:6px; bottom:14px; transform:rotate(3deg)">who finishes your sentences now<span>ARJUN</span></div>
+      <svg width="292" height="410" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g opacity=".8" stroke="#4A3A20" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#4A3A20" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+          <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px">
+        <div class="tab on">FRONT</div>
+        <div class="tab">BACK</div>
+      </div>
+      <div class="zones">collar 4 · body 15 · hem 4</div>
+    </div>
+
+    <div class="ctas">
+      <button class="primary tap">Sign this shirt</button>
+      <button class="quiet tap">Share her link</button>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ C2 · HOUSE COLOURS — signing ══════════════════════════════ -->
+<section class="screen c studio" data-name="c2-signing" data-chrome="none" data-time="17:12">
+  <div class="weave"></div>
+  <div class="wrap">
+    <div class="head">
+      <h2>You're signing<br>Ishita's shirt</h2>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <div class="canvas">
+      <div aria-hidden="true" style="position:absolute; left:16px; top:16px; right:16px; bottom:16px; overflow:hidden; border-radius:16px;">
+        <svg width="100%" height="100%" viewBox="0 0 390 640" preserveAspectRatio="xMidYMid slice">
+          <g opacity=".12" fill="none" stroke="#191410" stroke-width="4" stroke-linecap="round">
+            <path d="M46 120 C60 96 96 92 104 116 C110 134 84 142 78 128"/>
+            <path d="M300 470 C330 448 356 470 344 494"/>
+            <path d="M60 520 c-8 -10 -24 -2 -18 8 c4 8 16 10 16 10 c0 0 13 -2 17 -10 c5 -11 -9 -17 -15 -8"/>
+          </g>
+          <g opacity=".12" fill="#191410" font-family="Caveat" font-size="26">
+            <text x="196" y="88" transform="rotate(5 196 88)">2011 batch trips</text>
+            <text x="56" y="404" transform="rotate(-6 56 404)">hostel 7 forever</text>
+          </g>
+        </svg>
+      </div>
+      <div class="rail">
+        <button class="tool on" aria-label="Pen"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L20 6.5 17.5 4 5 16.5 4 20z"/></svg></button>
+        <button class="tool" aria-label="Marker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-4 5h8l-1-2"/><path d="M12 15l6.5-9.5a2 2 0 0 0-3-2.5L9 12"/></svg></button>
+        <button class="tool" aria-label="Highlighter"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 4l4 4-8 10H6v-4z"/><path d="M4 21h9"/></svg></button>
+        <button class="tool" aria-label="Sticker"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/></svg></button>
+        <button class="tool" aria-label="Text"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg></button>
+        <button class="tool" aria-label="Undo"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#191410" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a6 6 0 0 1 0 12h-3"/></svg></button>
+      </div>
+
+      <svg width="284" height="400" viewBox="0 0 400 600">
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FAF7F0" stroke="#191410" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#191410" stroke-width="3.5"/>
+        <g opacity=".8" stroke="#4A3A20" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#4A3A20" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+        </g>
+        <path d="M170 260 C186 246 210 276 226 258 C238 244 250 262 244 272" fill="none" stroke="#C43A2E" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="inks" data-system="ink-tray" style="background:#FAF7F0;border-radius:999px;padding:9px 14px;">
+      <button class="ink" data-hit-expanded style="background:#2D2923" aria-label="Ink black"></button>
+      <button class="ink on" data-hit-expanded style="background:#C43A2E" aria-label="Ink red"></button>
+      <button class="ink" data-hit-expanded style="background:#2563EB" aria-label="Ink blue"></button>
+      <button class="ink" data-hit-expanded style="background:#5F8B48" aria-label="Ink green"></button>
+      <button class="ink" data-hit-expanded style="background:#7C3AED" aria-label="Ink purple"></button>
+      <button class="ink" data-hit-expanded style="background:#EA580C" aria-label="Ink orange"></button>
+      <button class="ink" data-hit-expanded style="background:#0891B2" aria-label="Ink teal"></button>
+    </div>
+
+    <div class="foot">
+      <div class="draft">Saved as draft · 20s ago</div>
+      <div class="pub">
+        <button class="justsign tap">Just sign</button>
+        <button class="publish tap">Publish</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.js"></script>
+</body>
+</html>

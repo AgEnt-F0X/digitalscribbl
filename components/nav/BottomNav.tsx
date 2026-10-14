@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Compass, Bell, User, PenLine } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { useNotifications } from '@/lib/hooks/useNotifications'
 
 interface BottomNavProps {
-  unreadCount?: number
   currentUserId: string
 }
 
@@ -16,8 +16,9 @@ interface BottomNavProps {
  *
  * Hidden on desktop (md+) — desktop uses the top nav in AppShell.
  */
-export default function BottomNav({ unreadCount = 0, currentUserId }: BottomNavProps) {
+export default function BottomNav({ currentUserId }: BottomNavProps) {
   const pathname = usePathname()
+  const { unreadCount } = useNotifications(currentUserId)
 
   const isActive = (route: string, exact = false) => {
     if (exact) return pathname === route

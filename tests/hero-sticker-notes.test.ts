@@ -8,7 +8,7 @@
 // mobile-collapse rule, and the default slot count. Visual rendering is
 // covered by manual QA on /dev/sunlit-lawn.
 
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 
 import {

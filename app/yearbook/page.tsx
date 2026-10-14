@@ -9,6 +9,16 @@ import ExportRequestForm from './ExportRequestForm'
 
 export const dynamic = 'force-dynamic'
 
+interface GridRow {
+  id: string
+  display_name: string
+  avatar_config: unknown
+  head_front_url: string | null
+  yearbook_quote: string | null
+  batch_id: string
+  scribble_count: number
+}
+
 interface Props {
   searchParams: Promise<{ batch?: string; group?: string }>
 }
@@ -33,38 +43,21 @@ export default async function YearbookPage({ searchParams }: Props) {
     .select('id, label, graduation_year, programs(name, academic_groups(name))')
     .order('graduation_year', { ascending: false })
 
-  // Fetch all onboarded, non-suspended users in the selected batch
-  let usersQuery = supabase
-    .from('users')
-    .select(`
-      id, display_name, body_style, shirt_color, head_front_url, avatar_config,
-      yearbook_quote, batch_id,
-      batches(label, graduation_year, programs(name)),
-      shirts(front_texture_url, front_occupancy)
-    `)
+  // Fetch yearbook grid from the materialized view — avoids the N+1
+  // scribble-count query that the previous page did.
+  const { data: rawGrid } = await supabase
+    .from('yearbook_grid_stats')
+    .select('*')
     .eq('onboarding_completed', true)
-    .eq('is_suspended', false)
     .order('display_name')
 
+  let grid = (rawGrid ?? []) as GridRow[]
   if (activeBatchId) {
-    usersQuery = usersQuery.eq('batch_id', activeBatchId)
+    grid = grid.filter(r => r.batch_id === activeBatchId)
   }
-
-  const { data: users } = await usersQuery
-
-  // Scribble counts in bulk
-  const userIds = (users ?? []).map(u => u.id)
-  const { data: scribblesData } = userIds.length
-    ? await supabase.from('scribbles')
-        .select('shirt_id, shirts!inner(owner_id)')
-        .in('shirts.owner_id', userIds)
-        .eq('is_hidden', false)
-    : { data: [] }
-
   const countMap: Record<string, number> = {}
-  for (const s of scribblesData ?? []) {
-    const oid = (s.shirts as unknown as { owner_id: string }).owner_id
-    countMap[oid] = (countMap[oid] ?? 0) + 1
+  for (const r of grid) {
+    countMap[r.id] = r.scribble_count
   }
 
   const activeBatch = batches?.find(b => b.id === activeBatchId)
@@ -100,7 +93,7 @@ export default async function YearbookPage({ searchParams }: Props) {
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-2 flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-2xl font-display font-bold text-ink-900">Yearbook</h1>
-          <p className="text-sm text-gray-500">{batchLabel} · {users?.length ?? 0} students</p>
+          <p className="text-sm text-gray-500">{batchLabel} · {grid.length} students</p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -125,16 +118,14 @@ export default async function YearbookPage({ searchParams }: Props) {
           <p className="text-gray-500 mt-1">Scribbl · {new Date().getFullYear()}</p>
         </div>
 
-        {(users?.length ?? 0) === 0 ? (
+        {grid.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <p className="text-4xl mb-3">📖</p>
             <p>No students in this batch yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 print:grid-cols-4 print:gap-3">
-            {(users ?? []).map(u => {
-              const shirt      = (u.shirts as unknown as { front_texture_url: string | null }[] | null)?.[0]
-              const textureUrl = shirt?.front_texture_url
+            {grid.map(u => {
               const scribbles  = countMap[u.id] ?? 0
 
               return (
@@ -145,17 +136,12 @@ export default async function YearbookPage({ searchParams }: Props) {
                 >
                   <div className="relative w-full">
                     <Avatar
-                      row={u}
+                      row={{ avatar_config: u.avatar_config, head_front_url: u.head_front_url }}
                       displayName={u.display_name}
                       scribbleCount={scribbles}
                       size="sm"
                       className="mx-auto group-hover:scale-105 transition-transform"
                     />
-                    {textureUrl && (
-                      <div className="absolute bottom-0 left-0 right-0 h-[60%] overflow-hidden rounded-b-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        {/* Shirt preview on hover — just decorative */}
-                      </div>
-                    )}
                   </div>
 
                   <div className="text-center w-full">

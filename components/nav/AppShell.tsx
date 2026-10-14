@@ -82,7 +82,7 @@ export default function AppShell({
       </main>
 
       {!hideBottomNav && (
-        <BottomNav currentUserId={currentUserId} unreadCount={unreadCount ?? 0} />
+        <BottomNav currentUserId={currentUserId} />
       )}
     </div>
   )

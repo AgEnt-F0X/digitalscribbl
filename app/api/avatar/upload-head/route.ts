@@ -64,25 +64,40 @@ export async function POST(req: NextRequest) {
     .webp({ quality: 82 })
     .toBuffer()
 
-  const path      = `heads/${user.id}/${side}.webp`
-  const { error } = await db.storage
-    .from(BUCKET_HEADS)
-    .upload(path, processed, { contentType: 'image/webp', upsert: true })
+  const { isCloudinaryConfigured, uploadToCloudinary } = await import('@/lib/utils/cloudinary')
 
-  if (error) {
-    console.error('Head upload error:', error)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+  let finalUrl: string | null = null
+
+  // 1. Try Cloudinary offload if configured
+  if (isCloudinaryConfigured()) {
+    const cloudinaryRes = await uploadToCloudinary(processed, {
+      folder: 'scribbl/heads',
+      publicId: `${user.id}_${side}`,
+    })
+    if (cloudinaryRes?.url) {
+      finalUrl = `${cloudinaryRes.url}?v=${Date.now()}`
+    }
   }
 
-  const { data: { publicUrl } } = db.storage.from(BUCKET_HEADS).getPublicUrl(path)
+  // 2. Fallback to Supabase Storage if Cloudinary not configured or failed
+  if (!finalUrl) {
+    const path = `heads/${user.id}/${side}.webp`
+    const { error } = await db.storage
+      .from(BUCKET_HEADS)
+      .upload(path, processed, { contentType: 'image/webp', upsert: true })
 
-  // Append a cache-busting timestamp so CDN/browsers always serve the new image
-  // when a user re-uploads their head photo (same storage path, upserted).
-  const urlWithVersion = `${publicUrl}?v=${Date.now()}`
+    if (error) {
+      console.error('Head upload error:', error)
+      return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    }
+
+    const { data: { publicUrl } } = db.storage.from(BUCKET_HEADS).getPublicUrl(path)
+    finalUrl = `${publicUrl}?v=${Date.now()}`
+  }
 
   // Update user record with versioned URL
   const field = side === 'front' ? 'head_front_url' : 'head_back_url'
-  await db.from('users').update({ [field]: urlWithVersion }).eq('id', user.id)
+  await db.from('users').update({ [field]: finalUrl }).eq('id', user.id)
 
-  return NextResponse.json({ url: urlWithVersion })
+  return NextResponse.json({ url: finalUrl })
 }

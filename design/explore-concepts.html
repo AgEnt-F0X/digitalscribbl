@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scribbl — three new concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Baloo+2:wght@400..800&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Caveat:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.css">
+<style>
+  .screen { font-size: 16px; }
+  .hand { font-family: "Caveat", cursive; }
+  .wrap { position: absolute; inset: 0; padding: 18px 20px 88px; display: flex; flex-direction: column; }
+  .bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; }
+  .bitem { display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 700; }
+  .primary { width: 100%; min-height: 54px; border: none; border-radius: 12px; font-family: inherit; font-size: 18px; font-weight: 700; }
+  .pill { display: block; width: 100%; margin-top: 8px; min-height: 50px; background: transparent; color: inherit; border: 1.5px solid currentColor;
+    border-radius: 12px; font-family: inherit; font-size: 15px; font-weight: 700; }
+  .tabs { display: flex; align-items: baseline; justify-content: space-between; }
+  .tab { font-weight: 700; padding-bottom: 7px; }
+  .tab.on { box-shadow: inset 0 -3px 0 currentColor; }
+
+  /* ═══════════ 1 · THE MIXTAPE (media / dark / mono+hand / orange / shape) ═══════════ */
+  .m { background: #1B1815; color: #F2ECDF; font-family: "IBM Plex Mono", monospace; }
+  .m .topbar { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+  .m .rec { display: flex; align-items: center; gap: 7px; color: #FF8A2A; }
+  .m .rec i { width: 8px; height: 8px; border-radius: 50%; background: #FF8A2A; }
+  .m .labelcard { margin-top: 10px; border: 2px solid #F2ECDF; border-radius: 10px; background: #26221E; padding: 10px 12px 10px; position: relative; }
+  .m .labelcard .corner { position: absolute; top: 8px; right: 10px; font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #FF8A2A; }
+  .m .spools { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 10px; margin-top: 10px; }
+  .m .spool { width: 44px; height: 44px; border: 2.5px solid #F2ECDF; border-radius: 50%; display: grid; place-items: center; }
+  .m .spool i { width: 12px; height: 12px; border-radius: 50%; background: #F2ECDF; }
+  .m h1 { font-family: "Caveat", cursive; font-size: 40px; line-height: 1; margin: 2px 0 0; font-weight: 700; }
+  .m .sub { font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #B9AE9C; margin-top: 4px; }
+  .m .stage { display: grid; place-items: center; margin: 2px 0 0; }
+  .m .tracks { margin-top: 10px; }
+  .m .tr { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: baseline; border-top: 1px solid rgba(242,236,223,.22); padding: 7px 0; }
+  .m .tr .no { font-size: 11px; font-weight: 700; color: #FF8A2A; }
+  .m .tr em { display: block; font-family: "Caveat", cursive; font-style: normal; font-size: 18px; }
+  .m .tr span { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #B9AE9C; }
+  .m .tr.new { border-top: 1.5px solid #FF8A2A; }
+  .m .tr.new em, .m .tr.new span { color: #FF8A2A; }
+  .m .stats { margin-top: 10px; font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: #B9AE9C; }
+  .m .tabs { margin-top: 10px; }
+  .m .tab { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: #B9AE9C; }
+  .m .tab.on { color: #F2ECDF; box-shadow: inset 0 -3px 0 #FF8A2A; }
+  .m .primary { background: #FF8A2A; color: #1B1815; letter-spacing: .08em; text-transform: uppercase; }
+  .m .pill { letter-spacing: .08em; text-transform: uppercase; }
+  .m .bottom { border-top: 1.5px solid rgba(242,236,223,.2); }
+  .m .bitem { color: #B9AE9C; letter-spacing: .12em; text-transform: uppercase; }
+  .m .bitem.on { color: #F2ECDF; }
+
+  /* ═══════════ 2 · THE GARLAND (nature / red field / rounded / gold / illustration) ═══════════ */
+  .g { background: #A63324; color: #FBF3E4; font-family: "Baloo 2", sans-serif; }
+  .g .wrap { padding-bottom: 96px; }
+  .g .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .g .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; opacity: .85; }
+  .g .live { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; }
+  .g .live i { width: 8px; height: 8px; border-radius: 50%; background: #F2ECDF; }
+  .g .rope { margin: 6px -20px 0; }
+  .g h1 { font-size: 44px; font-weight: 800; line-height: .98; margin: 8px 0 0; }
+  .g .status { margin: 5px 0 0; font-size: 15px; font-weight: 600; }
+  .g .meta { font-size: 12.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .g .stage { position: relative; flex: 1; min-height: 0; }
+  .g .wallnote { position: absolute; font-family: "Caveat", cursive; font-size: 17px; line-height: 1; }
+  .g .wallnote span { display: block; font-family: "Baloo 2", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin-top: 2px; }
+  .g .tabs { margin-top: 6px; }
+  .g .tab { font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
+  .g .tab.on { opacity: 1; box-shadow: inset 0 -3px 0 #F6C563; }
+  .g .zones { font-size: 11px; font-weight: 600; opacity: .8; }
+  .g .ctas { margin-top: 12px; }
+  .g .primary { background: #F6C563; color: #5E1A10; letter-spacing: .04em; text-transform: uppercase; }
+  .g .bottom { border-top: 1.5px solid rgba(251,243,228,.3); }
+
+  /* ═══════════ 3 · THE DECK (play / felt / grotesque / red / colour-material) ═══════════ */
+  .d { background: #1F5C43; color: #F2EFE6; font-family: "Bricolage Grotesque", sans-serif; }
+  .d .felt { position: absolute; inset: 0; opacity: .07; pointer-events: none;
+    background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.9) 0 1.2px, transparent 1.6px); background-size: 9px 9px; }
+  .d .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .d .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; opacity: .85; }
+  .d .live { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; }
+  .d .live i { width: 8px; height: 8px; border-radius: 50%; background: #E85D45; }
+  .d .table { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; margin-top: 6px; }
+  .d .card { position: relative; width: 268px; height: 396px; background: #F7F4EA; color: #22201B; border-radius: 18px;
+             border: 2.5px solid #22201B; box-shadow: 10px 12px 0 rgba(9,32,22,.45); }
+  .d .card .idx { position: absolute; top: 10px; left: 12px; font-weight: 800; font-size: 19px; line-height: .9; text-transform: uppercase; }
+  .d .card .idx small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em; opacity: .6; }
+  .d .card .idx2 { position: absolute; top: 10px; right: 12px; text-align: right; font-weight: 800; font-size: 19px; line-height: .9; }
+  .d .card .idx2 small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em; opacity: .6; }
+  .d .card .banner { position: absolute; bottom: 44px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 21px; text-transform: uppercase; letter-spacing: .02em; }
+  .d .card .foot { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
+  .d .back { position: absolute; width: 268px; height: 396px; background: #E85D45; border: 2.5px solid #22201B; border-radius: 18px;
+             box-shadow: 10px 12px 0 rgba(9,32,22,.45); transform: rotate(-7deg) translate(-26px, 8px);
+             display: grid; place-items: center; }
+  .d .back svg { opacity: .9; }
+  .d .sig { position: absolute; font-family: "Caveat", cursive; font-size: 18px; line-height: 1; color: #F2EFE6; }
+  .d .sig span { display: block; font-family: "Bricolage Grotesque", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .7; margin-top: 2px; }
+  .d h1 { font-size: 30px; font-weight: 800; line-height: 1; text-transform: uppercase; margin: 10px 0 0; }
+  .d .status { margin: 4px 0 0; font-size: 15px; font-weight: 600; opacity: .92; }
+  .d .tabs { margin-top: 10px; }
+  .d .tab { font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
+  .d .tab.on { opacity: 1; box-shadow: inset 0 -3px 0 #E85D45; }
+  .d .ctas { margin-top: 12px; }
+  .d .primary { background: #C43A2E; color: #FFF6EF; letter-spacing: .04em; text-transform: uppercase; }
+  .d .bottom { border-top: 1.5px solid rgba(242,239,230,.28); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 1 · THE MIXTAPE — "your shirt is the tape; every mark is a dedicated track" ═══════════ -->
+<section class="screen m" data-name="m1-shirt" data-chrome="none" data-time="21:47">
+  <div class="wrap">
+    <div class="topbar">
+      <span>CSE 2026 · THE MIXTAPE</span>
+      <span class="rec"><i></i>3 HERE NOW</span>
+    </div>
+
+    <div class="labelcard">
+      <div class="corner">SIDE A</div>
+      <div class="spools">
+        <div class="spool" style="position:relative;"><i></i><svg width="44" height="44" viewBox="0 0 44 44" style="position:absolute; inset:0;" aria-hidden="true"><g stroke="#FF8A2A" stroke-width="2" stroke-linecap="round"><path d="M22 1 V6"/><path d="M22 38 V43"/><path d="M1 22 H6"/><path d="M38 22 H43"/></g></svg></div>
+        <div>
+          <h1>Ishita Bansal</h1>
+          <div class="sub">farewell tape · shirt no. 1 · 24 tracks, 17 friends</div>
+        </div>
+        <div class="spool"><i></i></div>
+      </div>
+      <div class="stage" style="position:relative; margin:8px -4px 2px -4px;">
+        <div aria-hidden="true" style="position:absolute; left:50%; top:36px; transform:translateX(-50%); width:196px; height:136px; background:#141210; border-radius:8px; border:2px solid #0E0C0A;"></div>
+        <svg width="238" height="250" viewBox="0 0 400 600" style="position:relative;">
+          <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+                fill="#F2ECDF" stroke="#1B1815" stroke-width="5"/>
+          <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#1B1815" stroke-width="3.5"/>
+          <g opacity=".55" stroke="#7A6E58" stroke-width="4" fill="none" stroke-linecap="round">
+            <path d="M146 214 C166 202 192 216 204 236"/>
+            <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+          </g>
+          <g fill="#5E5342" style="color:#5E5342" font-family="Caveat" font-size="30">
+            <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+            <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+          </g>
+          <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#FF8A2A" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; font-size:28px; font-weight:600; letter-spacing:-.01em; line-height:1;">24 TRACKS <span style="color:#B9AE9C">· 17 FRIENDS</span></div>
+    <div class="tracks">
+      <div class="tr new">
+        <div class="no">A24</div>
+        <div><em>still owe you for the DX lab</em> <span>· Kabir · 2h ago</span></div>
+        <div class="rec" style="align-self:center; font-size:11px;">REC <i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#FF8A2A;vertical-align:middle;"></i></div>
+      </div>
+      <div class="tr">
+        <div class="no">A23</div>
+        <div><em>frontend queen, never change</em> <span>· Meghna · Tue</span></div>
+      </div>
+      <div class="tr">
+        <div class="no">A11</div>
+        <div><em>who finishes your sentences now</em> <span>· Arjun · 12 Oct</span></div>
+      </div>
+    </div>
+
+    <div class="stats">SIDE B · 4 FREE · SIDE A FULL</div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:24px"><div class="tab on">SIDE A</div><div class="tab">SIDE B</div></div>
+    </div>
+
+    <div class="ctas" style="margin-top:auto">
+      <button class="primary">Dedicate a track</button>
+      <button class="pill">Share the tape</button>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="bitem on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═══════════ 2 · THE GARLAND — "the batch strings marigolds for every leaver; each mark is a bloom" ═══════════ -->
+<section class="screen g" data-name="g1-shirt" data-chrome="none" data-time="17:10">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="eyebrow">CSE · CLASS OF 2026</div>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <!-- garland rope strung across; the shirt hangs from it like the farewell portrait -->
+    <div class="rope">
+      <svg width="402" height="64" viewBox="0 0 402 64" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M-4 10 C 90 44, 312 44, 406 10" fill="none" stroke="#5E1A10" stroke-width="3.5"/>
+        <g fill="#F6C563" stroke="#5E1A10" stroke-width="2">
+          <circle cx="36" cy="24" r="9"/><circle cx="86" cy="33" r="9"/><circle cx="140" cy="39" r="9"/><circle cx="201" cy="41" r="9"/><circle cx="262" cy="39" r="9"/><circle cx="316" cy="33" r="9"/><circle cx="366" cy="24" r="9"/>
+        </g>
+        <g fill="#F6C563" stroke="#5E1A10" stroke-width="2">
+          <circle cx="61" cy="30" r="8" fill="#C43A2E"/><circle cx="113" cy="37" r="8" fill="#C43A2E"/><circle cx="170" cy="41" r="8" fill="#C43A2E"/><circle cx="231" cy="41" r="8" fill="#C43A2E"/><circle cx="289" cy="37" r="8" fill="#C43A2E"/><circle cx="341" cy="30" r="8" fill="#C43A2E"/>
+        </g>
+      </svg>
+    </div>
+
+    <h1>Ishita Bansal</h1>
+    <p class="status">24 blooms from 17 friends · shirt 1 of 2</p>
+    <p class="meta" style="margin-top:3px">№ 24 · Kabir · 2h ago</p>
+
+    <div class="stage">
+      <svg width="286" height="330" viewBox="0 0 400 600" style="filter: drop-shadow(0 14px 0 rgba(94,26,16,.35));">
+        <path d="M-20 -8 L 186 66" fill="none" stroke="#5E1A10" stroke-width="3.5"/>
+        <path d="M214 66 L 420 -8" fill="none" stroke="#5E1A10" stroke-width="3.5"/>
+        <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+              fill="#FBF3E4" stroke="#5E1A10" stroke-width="5"/>
+        <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#5E1A10" stroke-width="3.5"/>
+        <g fill="#F6C563" stroke="#5E1A10" stroke-width="2">
+          <circle cx="186" cy="66" r="10"/><circle cx="214" cy="66" r="10"/>
+        </g>
+        <g opacity=".6" stroke="#8A4A3A" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M146 214 C166 202 192 216 204 236"/>
+          <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+        </g>
+        <g fill="#8A4A3A" style="color:#8A4A3A" font-family="Caveat" font-size="30">
+          <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+          <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+        </g>
+        <path d="M186 98 C198 112 214 86 228 100" fill="none" stroke="#F6C563" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:4px">
+      <div class="wallnote" style="position:static; transform:rotate(-2deg)">still owe you for the DX lab<span>KABIR · 2H AGO</span></div>
+      <div class="wallnote" style="position:static; transform:rotate(1deg)">frontend queen, never change<span>MEGHNA</span></div>
+      <div class="wallnote" style="position:static; transform:rotate(-1deg)">who finishes your sentences now<span>ARJUN</span></div>
+    </div>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px"><div class="tab on">FRONT</div><div class="tab">BACK</div></div>
+      <div class="zones">collar 4 · body 16 · hem 4</div>
+    </div>
+    <div class="ctas">
+      <button class="primary">Sign this shirt</button>
+      <button class="pill">Share her link</button>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="bitem on" style="opacity:1"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<!-- ═══════════ 3 · THE DECK — "the batch is a deck of cards; you sign the back of each one" ═══════════ -->
+<section class="screen d" data-name="d1-shirt" data-chrome="none" data-time="20:05">
+  <div class="felt"></div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="eyebrow">THE DECK · CSE 2026 · 312 CARDS</div>
+      <div class="live"><i></i>3 here now</div>
+    </div>
+
+    <div class="table">
+      <div class="back" aria-hidden="true">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <g fill="none" stroke="#FFF6EF" stroke-width="3">
+            <path d="M60 12 C70 30 90 34 90 52 C90 68 74 76 60 76 C46 76 30 68 30 52 C30 34 50 30 60 12 Z"/>
+            <path d="M38 92 C50 82 70 82 82 92" stroke-linecap="round"/>
+            <circle cx="60" cy="100" r="5" fill="#FFF6EF" stroke="none"/>
+          </g>
+        </svg>
+      </div>
+      <div class="card">
+        <div class="idx">IB<small>THE DECK</small></div>
+        <div class="idx2">№24<small>OF 312</small></div>
+        <svg width="196" height="252" viewBox="0 0 400 600" style="position:absolute; top:34px; left:50%; transform:translateX(-50%);">
+          <path d="M150 64 C168 92 232 92 250 64 L322 96 C336 102 342 116 336 130 L310 194 L298 186 L298 496 C298 507 290 515 279 515 L121 515 C110 515 102 507 102 496 L102 186 L90 194 L64 130 C58 116 64 102 78 96 Z"
+                fill="#FFFFFF" stroke="#22201B" stroke-width="5"/>
+          <path d="M156 68 C172 96 228 96 244 68" fill="none" stroke="#22201B" stroke-width="3.5"/>
+          <g opacity=".55" stroke="#8A7A62" stroke-width="4" fill="none" stroke-linecap="round">
+            <path d="M146 214 C166 202 192 216 204 236"/>
+            <path d="M204 236 l-11 -6 M204 236 l-12 2"/>
+          </g>
+          <g fill="#5E5342" style="color:#5E5342" font-family="Caveat" font-size="30">
+            <text x="150" y="308" transform="rotate(-3 150 308)">bon voyage</text>
+            <text x="196" y="430" transform="rotate(4 196 430)">2026</text>
+          </g>
+        </svg>
+        <div class="banner">Ishita Bansal</div>
+        <div class="foot">24 SIGNED · 17 FRIENDS · 2 PATCHES FREE</div>
+      </div>
+      <div class="sig" style="right:0; top:0; transform:rotate(6deg)">signed the back<span>KABIR · 2H AGO</span></div>
+    </div>
+
+    <p class="status" style="margin-top:8px">Card № 24 of 312 · the back holds the signatures</p>
+
+    <div class="tabs">
+      <div style="display:flex;gap:18px"><div class="tab on">FRONT</div><div class="tab">BACK · THE SIGNATURES</div></div>
+    </div>
+    <div class="ctas">
+      <button class="primary">Sign the back of this card</button>
+      <button class="pill">Share her card</button>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="bitem on" style="opacity:1"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>HOME</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg>EXPLORE</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>ACTIVITY</div>
+    <div class="bitem" style="opacity:.7"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>ME</div>
+  </div>
+</section>
+
+<script src="file:///D:/Downloads/app-designer/App%20Designer/app-designer/assets/device.js"></script>
+</body>
+</html>

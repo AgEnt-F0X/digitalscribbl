@@ -1,6 +1,12 @@
-// ── Bounding Box Collision Detection ─────────────────────────
-// Used on both client (real-time UX) and server (commit validation).
-// Axis-Aligned Bounding Box (AABB) intersection test.
+// ── Shirt Occupancy ─────────────────────────────────────────
+// Scribbles deliberately overlap — v1 placement ran an AABB collision test,
+// v2 dropped it ("Scribbles MAY overlap. No collision blocking is performed.",
+// docs/03-product-flows.md) once the studio moved to free-form drawing. The
+// hasCollision / getCollisions / clampToCanvas helpers that backed that gate
+// are gone. `boxesOverlap` stays because tests/scribble-contract.test.ts uses it
+// as the reference implementation proving normalizeScribbleBox's integer
+// rounding preserves edge-touching semantics — it documents a contract, it does
+// not gate a placement.
 
 export interface BBox {
   x: number
@@ -17,31 +23,6 @@ export function boxesOverlap(a: BBox, b: BBox): boolean {
     a.y + a.h <= b.y ||   // a is entirely above b
     a.y       >= b.y + b.h    // a is entirely below b
   )
-}
-
-/** Returns true if `candidate` overlaps any box in `existing`. */
-export function hasCollision(candidate: BBox, existing: BBox[]): boolean {
-  return existing.some(b => boxesOverlap(candidate, b))
-}
-
-/** Returns the subset of boxes that overlap `candidate`. */
-export function getCollisions(candidate: BBox, existing: BBox[]): BBox[] {
-  return existing.filter(b => boxesOverlap(candidate, b))
-}
-
-/** Clamp a box so it stays within the shirt canvas boundaries. */
-export function clampToCanvas(
-  box: BBox,
-  canvasW: number,
-  canvasH: number,
-  minSize: number,
-  maxSize: number
-): BBox {
-  const w = Math.max(minSize, Math.min(maxSize, box.w))
-  const h = Math.max(minSize, Math.min(maxSize, box.h))
-  const x = Math.max(0, Math.min(canvasW - w, box.x))
-  const y = Math.max(0, Math.min(canvasH - h, box.y))
-  return { x, y, w, h }
 }
 
 /**

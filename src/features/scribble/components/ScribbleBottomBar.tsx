@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, Maximize2, Minus, Plus, Send, Trash2 } from 'lucide-react'
+import { Maximize2, Minus, Plus, Send, Trash2 } from 'lucide-react'
 import type { CanvasMode } from '../types'
 
 interface ScribbleBottomBarProps {
@@ -10,7 +10,6 @@ interface ScribbleBottomBarProps {
   onZoom: (zoom: number) => void
   onFitZoom: () => void
   onClear: () => void
-  onPreview: () => void
   onPublish: () => void
   canPublish: boolean
   isSaving: boolean
@@ -39,7 +38,6 @@ export default function ScribbleBottomBar({
   onZoom,
   onFitZoom,
   onClear,
-  onPreview,
   onPublish,
   canPublish,
   isSaving,
@@ -55,7 +53,7 @@ export default function ScribbleBottomBar({
     >
       {/* Mobile: condensed Publish bar with a slim zoom cluster on the left
           so the user can zoom on phones without opening the bottom sheet. */}
-      <div className="flex items-center gap-2 px-3 py-2 md:hidden">
+      <div className="flex items-center gap-2 px-3 py-2 lg:hidden">
         <div className="inline-flex items-center gap-1 rounded-2xl border border-black/10 bg-white px-2 py-1 text-xs font-semibold">
           <button
             type="button"
@@ -99,7 +97,7 @@ export default function ScribbleBottomBar({
       </div>
 
       {/* Desktop: full toolbar */}
-      <div className="hidden gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto_auto_auto] md:items-center">
+      <div className="hidden gap-3 px-4 py-3 lg:grid lg:grid-cols-[1fr_auto_auto_auto] lg:items-center">
         <p className="rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-ink-500">
           {status}
         </p>
@@ -138,14 +136,6 @@ export default function ScribbleBottomBar({
           </button>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onPreview}
-            className="inline-flex flex-1 min-h-11 items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold hover:bg-black/5"
-          >
-            <Eye size={16} />
-            Preview
-          </button>
           <button
             type="button"
             onClick={onClear}

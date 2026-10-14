@@ -241,7 +241,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
       <nav className="sticky top-0 z-30 border-b border-[color:var(--line-soft)] bg-paper-100/88 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
-          <Link href="/dashboard" className="scribble-underline font-display text-2xl font-bold leading-none text-ink-900">
+          <Link href="/dashboard" className="scribble-underline font-display text-3xl font-bold leading-none text-ink-900">
             Scribbl
           </Link>
           <div className="flex items-center gap-3">
@@ -375,7 +375,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--line-soft)] bg-white/85 p-2 backdrop-blur-sm shadow-sm">
             <div className="flex gap-1">
-              {(['front', 'back', 'sleeves'] as Panel[]).map(p => (
+              {/* Sleeves stayed view-only legacy after the studio became the
+                  single signing surface (front/back) — tab removed. */}
+              {(['front', 'back'] as Panel[]).map(p => (
                 <Link
                   key={p}
                   href={`?shirt=${shirtNum}&panel=${p}`}

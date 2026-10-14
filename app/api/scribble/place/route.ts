@@ -129,6 +129,19 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const { x, y, w, h } = normalizedBox.box
+
+  // Full-canvas guard: reject scribbles that cover ≥95 % of the shirt.
+  // The studio's `exportLayer()` returns tight bounds, so a near-full-canvas
+  // dimension means the user painted wall-to-wall (intentionally or via FL2
+  // direct-mode mismatch). These degrade the yearbook grid.
+  if (w / SHIRT_W >= 0.95 && h / SHIRT_H >= 0.95) {
+    return NextResponse.json(
+      { error: 'Scribble covers nearly the full shirt — draw a smaller signature', code: 'FULL_CANVAS' },
+      { status: 400 },
+    )
+  }
+
   if (normalizedPlacementMode !== 'direct' && !isBoxInsideDrawableRegion(normalizedBox.box, panel)) {
     return NextResponse.json(
       { error: 'Scribble must stay inside the shirt', code: 'OUTSIDE_REGION' },
@@ -143,7 +156,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { x, y, w, h } = normalizedBox.box
   const sanitizedSvg = sanitizeScribbleSvg(canvas_svg)
   if (!sanitizedSvg.ok) {
     const status = sanitizedSvg.error.includes('too large') ? 413 : 400

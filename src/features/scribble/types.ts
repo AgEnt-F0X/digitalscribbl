@@ -38,42 +38,6 @@ export interface Transform2D {
   rotation: number
 }
 
-export interface ShirtStroke {
-  id: string
-  side: ShirtSide
-  tool: 'pen' | 'pencil' | 'marker' | 'highlighter' | 'eraser'
-  color: string
-  strokeWidth: number
-  points: NormalizedPoint[]
-  createdAt: string
-  createdByUserId?: string
-}
-
-export interface ShirtTextScribble {
-  id: string
-  side: ShirtSide
-  text: string
-  fontStyleId: string
-  color: string
-  fontSize: number
-  highlight?: {
-    enabled: boolean
-    color: string
-  }
-  transform: Transform2D
-  createdAt: string
-  createdByUserId?: string
-}
-
-export interface ShirtStickerScribble {
-  id: string
-  side: ShirtSide
-  stickerId: string
-  transform: Transform2D
-  createdAt: string
-  createdByUserId?: string
-}
-
 export interface OutsideNote {
   id: string
   text: string
@@ -98,29 +62,9 @@ export interface OutsideStickerReaction {
   createdByUserId?: string
 }
 
-export interface ScribbleDraft {
-  shirtId: string
-  activeSide: ShirtSide
-  activeMode: CanvasMode
-  shirtStrokes: ShirtStroke[]
-  shirtTexts: ShirtTextScribble[]
-  shirtStickers: ShirtStickerScribble[]
-  outsideNotes: OutsideNote[]
-  outsideReactions: OutsideStickerReaction[]
-}
-
 export function normalizeScribblePoint(point: NormalizedPoint): NormalizedPoint {
   return {
     x: Math.max(0, Math.min(1, point.x)),
     y: Math.max(0, Math.min(1, point.y)),
-  }
-}
-
-export function normalizeTransform(transform: Transform2D): Transform2D {
-  return {
-    x: Math.max(0, Math.min(1, transform.x)),
-    y: Math.max(0, Math.min(1, transform.y)),
-    scale: Math.max(0.2, Math.min(3, transform.scale)),
-    rotation: Math.max(-180, Math.min(180, transform.rotation)),
   }
 }

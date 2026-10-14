@@ -35,3 +35,11 @@ next-dev*.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private student roster artifacts
+.private-roster/
+
+# logs and audit artifacts
+*.log
+audit-shots/
+.workbuddy-ai/

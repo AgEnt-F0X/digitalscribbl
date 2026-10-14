@@ -346,6 +346,28 @@ export default async function DashboardPage() {
       />
 
       <main className="relative z-10 mx-auto w-full max-w-screen-md px-4 pt-6 sm:pt-10 md:max-w-screen-lg md:pb-12">
+        {/* ───────── DEFERRED AVATAR STUDIO BANNER ────────────────────────── */}
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-100/90 via-rose-50/90 to-indigo-50/90 border-2 border-amber-300 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-left">
+            <span className="text-3xl p-2 rounded-2xl bg-white shadow-sm">🎨</span>
+            <div>
+              <h2 className="font-display font-bold text-base text-ink-900 flex items-center gap-1.5">
+                <span>Personalize Your Virtual Shirt & AI Head</span>
+                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">New Studio</span>
+              </h2>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Customize your hairstyle, skin tone, and face photo for your final printed Yearbook Card.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/onboarding/avatar"
+            className="w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl bg-ink-900 text-paper-100 font-semibold text-xs hover:bg-ink-800 transition shadow flex items-center justify-center gap-1.5"
+          >
+            <span>Open Avatar Studio</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          </Link>
+        </div>
         {/* ───────── HERO REGION ─────────────────────────────────────
             Composition matches the canonical avatar-view concept image:
             avatar centred under a soft brand-soft halo, four sticker

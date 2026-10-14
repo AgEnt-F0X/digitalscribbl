@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 import AvatarRenderer from '@/src/features/avatar/components/AvatarRenderer'
 import type { UserAvatarConfig } from '@/src/features/avatar/types'
@@ -28,6 +29,8 @@ interface OutsideNotesCanvasProps {
   reactions: OutsideStickerReaction[]
   selectedObject: SelectedOutsideObject
   onSelect: (object: SelectedOutsideObject) => void
+  onUpdateNote?: (id: string, patch: Partial<OutsideNote>) => void
+  onUpdateReaction?: (id: string, patch: Partial<OutsideStickerReaction>) => void
 }
 
 function positionStyle(transform: OutsideNote['transform']) {
@@ -47,9 +50,89 @@ export default function OutsideNotesCanvas({
   reactions,
   selectedObject,
   onSelect,
+  onUpdateNote,
+  onUpdateReaction,
 }: OutsideNotesCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [dragState, setDragState] = useState<{
+    id: string
+    type: 'outside-note' | 'outside-reaction'
+    startX: number
+    startY: number
+    initialX: number
+    initialY: number
+  } | null>(null)
+
+  const handlePointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    type: 'outside-note' | 'outside-reaction',
+    id: string,
+    initialX: number,
+    initialY: number
+  ) => {
+    onSelect({ type, id })
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDragState({
+      id,
+      type,
+      startX: event.clientX,
+      startY: event.clientY,
+      initialX,
+      initialY,
+    })
+    event.stopPropagation()
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragState) return
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+
+    const dx = event.clientX - dragState.startX
+    const dy = event.clientY - dragState.startY
+
+    const ndx = dx / rect.width
+    const ndy = dy / rect.height
+
+    const newX = Math.max(0, Math.min(1, dragState.initialX + ndx))
+    const newY = Math.max(0, Math.min(1, dragState.initialY + ndy))
+
+    if (dragState.type === 'outside-note') {
+      const note = notes.find(n => n.id === dragState.id)
+      if (note) {
+        onUpdateNote?.(dragState.id, {
+          transform: {
+            ...note.transform,
+            x: newX,
+            y: newY,
+          },
+        })
+      }
+    } else {
+      const reaction = reactions.find(r => r.id === dragState.id)
+      if (reaction) {
+        onUpdateReaction?.(dragState.id, {
+          transform: {
+            ...reaction.transform,
+            x: newX,
+            y: newY,
+          },
+        })
+      }
+    }
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragState) return
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    setDragState(null)
+  }
+
   return (
     <div
+      ref={containerRef}
       className="relative mx-auto aspect-[4/5] w-full max-w-[760px] overflow-hidden rounded-[34px] border border-black/10 bg-paper-100 shadow-paper md:aspect-auto md:min-h-[660px]"
       onClick={() => onSelect(null)}
     >
@@ -87,12 +170,12 @@ export default function OutsideNotesCanvas({
           <button
             key={note.id}
             type="button"
-            onClick={event => {
-              event.stopPropagation()
-              onSelect({ type: 'outside-note', id: note.id })
-            }}
+            onPointerDown={event => handlePointerDown(event, 'outside-note', note.id, note.transform.x, note.transform.y)}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
             className={cn(
-              'absolute max-w-[150px] rounded-[22px] border p-2.5 text-left shadow-[0_10px_24px_rgba(45,35,22,0.12)] transition md:max-w-[190px] md:p-3',
+              'absolute max-w-[150px] rounded-[22px] border p-2.5 text-left shadow-[0_10px_24px_rgba(45,35,22,0.12)] md:max-w-[190px] md:p-3 cursor-move select-none',
+              dragState?.id === note.id ? 'transition-none z-10' : 'transition',
               note.noteStyle === 'sticky'
                 ? 'border-[#e9d37d] bg-[#fff2a8]'
                 : note.noteStyle === 'speech-bubble'
@@ -100,7 +183,10 @@ export default function OutsideNotesCanvas({
                   : 'border-black/10 bg-paper-50',
               selected && 'ring-4 ring-brand/25',
             )}
-            style={positionStyle(note.transform)}
+            style={{
+              ...positionStyle(note.transform),
+              touchAction: 'none',
+            }}
           >
             <span
               className="block leading-snug"
@@ -125,17 +211,20 @@ export default function OutsideNotesCanvas({
           <button
             key={reaction.id}
             type="button"
-            onClick={event => {
-              event.stopPropagation()
-              onSelect({ type: 'outside-reaction', id: reaction.id })
-            }}
+            onPointerDown={event => handlePointerDown(event, 'outside-reaction', reaction.id, reaction.transform.x, reaction.transform.y)}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
             title={sticker.label}
             aria-label={sticker.label}
             className={cn(
-              'absolute flex h-14 w-14 items-center justify-center rounded-3xl border border-black/10 bg-white text-2xl shadow-[0_10px_24px_rgba(45,35,22,0.14)] transition hover:-translate-y-1 md:h-16 md:w-16 md:text-3xl',
+              'absolute flex h-14 w-14 items-center justify-center rounded-3xl border border-black/10 bg-white text-2xl shadow-[0_10px_24px_rgba(45,35,22,0.14)] md:h-16 md:w-16 md:text-3xl cursor-move select-none',
+              dragState?.id === reaction.id ? 'transition-none z-10' : 'transition hover:-translate-y-1',
               selected && 'ring-4 ring-brand/25',
             )}
-            style={positionStyle(reaction.transform)}
+            style={{
+              ...positionStyle(reaction.transform),
+              touchAction: 'none',
+            }}
           >
             {sticker.symbol}
           </button>

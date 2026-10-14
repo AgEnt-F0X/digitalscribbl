@@ -46,8 +46,8 @@ export interface HeroNoteSlot {
  * corners (md+ only) for the desktop "messages drifting all around" look.
  */
 export const DEFAULT_HERO_NOTE_SLOTS: readonly HeroNoteSlot[] = [
-  { top: '4%',  left:  '2%', rotation: -8,  tone: 'yellow', mobile: true,  width: '150px' },
-  { top: '10%', right: '2%', rotation: 7,   tone: 'pink',   mobile: true,  width: '150px' },
+  { top: '4%',  left:  '0%', rotation: -8,  tone: 'yellow', mobile: true,  width: 'clamp(100px, 28vw, 150px)' },
+  { top: '10%', right: '0%', rotation: 7,   tone: 'pink',   mobile: true,  width: 'clamp(100px, 28vw, 150px)' },
   { top: '58%', left:  '0%', rotation: -10, tone: 'green',  mobile: false, width: '160px' },
   { top: '62%', right: '0%', rotation: 9,   tone: 'blue',   mobile: false, width: '160px' },
 ]

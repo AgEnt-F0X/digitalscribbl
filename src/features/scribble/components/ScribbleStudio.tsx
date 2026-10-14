@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils/cn'
 import {
   CANVAS_COLORS,
-  SHIRT_H,
-  SHIRT_W,
   TOOL_ARROW,
   TOOL_BRUSH,
   TOOL_CIRCLE,
@@ -33,7 +32,6 @@ import type {
   CanvasMode,
   OutsideNote,
   OutsideStickerReaction,
-  ScribbleDraft,
   ScribbleTool,
   ShirtSide,
 } from '../types'
@@ -44,6 +42,7 @@ import ScribbleToolbar from './ScribbleToolbar'
 import ScribbleTopBar from './ScribbleTopBar'
 import ScribbleWorkspace from './ScribbleWorkspace'
 import SignaturePanel from './SignaturePanel'
+import { useShirtChannel } from '@/lib/hooks/useShirtChannel'
 
 interface ScribbleStudioProps {
   shirtId: string
@@ -53,6 +52,8 @@ interface ScribbleStudioProps {
   currentUserId: string
   currentUserName: string
   permissionState: 'can' | 'request' | 'locked' | 'own'
+  /** Which shirt side opens first (e.g. deep-linked from the profile's back tab). */
+  initialSide?: ShirtSide
   ownerAvatarConfig: UserAvatarConfig
   existingScribbles: Pick<ScribbleRow, 'id' | 'x' | 'y' | 'w' | 'h' | 'canvas_svg' | 'panel'>[]
 }
@@ -69,6 +70,33 @@ const MAX_RECENT_COLORS = 6
 
 function makeId(prefix: string) {
   return `${prefix}-${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString(36)}`
+}
+
+// Draft storage. The shirt canvas is persisted per side as raw Fabric JSON
+// (same shape ShirtView stores), outside notes as a small JSON envelope.
+// Everything is best-effort: storage failures must never block drawing.
+function flatDraftKey(shirtId: string, side: ShirtSide) {
+  return `scribbl:flat-editor:${shirtId}:${side}`
+}
+
+function outsideDraftKey(shirtId: string) {
+  return `scribbl:studio:${shirtId}`
+}
+
+function readStoredCanvasDrafts(shirtId: string): Record<ShirtSide, object | null> {
+  const empty: Record<ShirtSide, object | null> = { front: null, back: null }
+  if (typeof window === 'undefined') return empty
+  const read = (drawSide: ShirtSide): object | null => {
+    try {
+      const raw = window.localStorage.getItem(flatDraftKey(shirtId, drawSide))
+      if (!raw) return null
+      const parsed: unknown = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' && hasDrawableFabricJson(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  return { front: read('front'), back: read('back') }
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -146,13 +174,21 @@ export default function ScribbleStudio({
   currentUserId,
   currentUserName,
   permissionState,
+  initialSide = 'front',
   ownerAvatarConfig,
   existingScribbles,
 }: ScribbleStudioProps) {
   const router = useRouter()
   const drawingRef = useRef<DrawingCanvasRef>(null)
   const [activeMode, setActiveMode] = useState<CanvasMode>('shirt')
-  const [side, setSide] = useState<ShirtSide>('front')
+  const [side, setSide] = useState<ShirtSide>(initialSide)
+  const { viewerCount, isConnected, broadcastTextureUpdated } = useShirtChannel({
+    ownerId,
+    shirtNumber,
+    currentPanel: side as Panel,
+    currentUserId,
+    currentUserName,
+  })
   const [tool, setTool] = useState<ScribbleTool>('pen')
   const [color, setColorState] = useState<string>(CANVAS_COLORS[0])
   const [recentColors, setRecentColors] = useState<string[]>([])
@@ -160,7 +196,10 @@ export default function ScribbleStudio({
   const [fontStyleId, setFontStyleId] = useState('casual')
   const [highlightEnabled, setHighlightEnabled] = useState(false)
   const [fillShapes, setFillShapes] = useState(false)
-  const [draftJsonBySide, setDraftJsonBySide] = useState<Record<ShirtSide, object | null>>({ front: null, back: null })
+  // Lazily seeded from localStorage so a refresh mid-scribble restores the
+  // drawing. Safe during hydration: the value only feeds DrawingCanvas's
+  // imperative mount-time load, never server-rendered markup.
+  const [draftJsonBySide, setDraftJsonBySide] = useState<Record<ShirtSide, object | null>>(() => readStoredCanvasDrafts(shirtId))
   const [hasDrawingBySide, setHasDrawingBySide] = useState<Record<ShirtSide, boolean>>({ front: false, back: false })
   const [outsideNotes, setOutsideNotes] = useState<OutsideNote[]>([])
   const [outsideReactions, setOutsideReactions] = useState<OutsideStickerReaction[]>([])
@@ -173,6 +212,24 @@ export default function ScribbleStudio({
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isDrawingActive, setIsDrawingActive] = useState(false)
+
+  useEffect(() => {
+    if (!isDrawingActive) return
+    const handleUp = () => setIsDrawingActive(false)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
+    return () => {
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
+    }
+  }, [isDrawingActive])
+
+  const handleWorkspacePointerDown = (e: React.PointerEvent) => {
+    if (activeMode === 'shirt' && tool !== 'select' && tool !== 'text' && tool !== 'sticky-note' && tool !== 'sticker') {
+      setIsDrawingActive(true)
+    }
+  }
 
   // Signature mode — when active the studio swaps the full toolbar for a
   // compact font/color/size inspector and pre-loads the canvas with a
@@ -231,24 +288,21 @@ export default function ScribbleStudio({
     setZoom(100)
   }
 
-  function buildDraft(): ScribbleDraft {
-    return {
-      shirtId,
-      activeSide: side,
-      activeMode,
-      shirtStrokes: [],
-      shirtTexts: [],
-      shirtStickers: [],
-      outsideNotes,
-      outsideReactions,
-    }
-  }
-
   function saveDraft(showMessage = true) {
-    window.localStorage.setItem(`scribbl:studio:${shirtId}`, JSON.stringify(buildDraft()))
-    if (showMessage) {
-      setMessage(outsideDirty ? 'Draft saved. Outside notes are kept separate from shirt scribbles.' : 'Draft saved.')
-      setError(null)
+    try {
+      const canvasJson = drawingRef.current?.exportJson()
+      if (canvasJson && hasDrawableFabricJson(canvasJson)) {
+        window.localStorage.setItem(flatDraftKey(shirtId, side), JSON.stringify(canvasJson))
+      }
+      if (outsideDirty) {
+        window.localStorage.setItem(outsideDraftKey(shirtId), JSON.stringify({ outsideNotes, outsideReactions }))
+      }
+      if (showMessage) {
+        setMessage('Draft saved on this device — it will be here when you come back.')
+        setError(null)
+      }
+    } catch {
+      if (showMessage) setError('Could not save the draft on this device.')
     }
   }
 
@@ -302,7 +356,15 @@ export default function ScribbleStudio({
     const drawable = hasDrawableFabricJson(json)
     setHasDrawingBySide(current => ({ ...current, [side]: drawable }))
     setDraftJsonBySide(current => ({ ...current, [side]: drawable ? json : null }))
-    window.localStorage.setItem(`scribbl:flat-editor:${shirtId}:${side}`, JSON.stringify(buildDraft()))
+    try {
+      if (drawable) {
+        window.localStorage.setItem(flatDraftKey(shirtId, side), JSON.stringify(json))
+      } else {
+        window.localStorage.removeItem(flatDraftKey(shirtId, side))
+      }
+    } catch {
+      // Storage may be full or blocked — drafts are best-effort.
+    }
   }
 
   function insertText(text: string) {
@@ -467,7 +529,10 @@ export default function ScribbleStudio({
     setError(null)
     setMessage(null)
 
-    const layer = await drawingRef.current.exportLayer({ fullCanvas: true })
+    // Tight layer bounds (not the whole 400×600 canvas): keeps stored SVGs
+    // small, keeps panel occupancy meaningful, and lets the yearbook
+    // composite scribbles as real layers.
+    const layer = await drawingRef.current.exportLayer()
     if (!layer) {
       setIsSaving(false)
       setError('Draw or place something on the shirt before sending.')
@@ -484,10 +549,10 @@ export default function ScribbleStudio({
         owner_id: ownerId,
         shirt_number: shirtNumber,
         panel: side as Panel,
-        x: 0,
-        y: 0,
-        w: SHIRT_W,
-        h: SHIRT_H,
+        x: layer.box.x,
+        y: layer.box.y,
+        w: layer.box.w,
+        h: layer.box.h,
         canvas_svg: layer.canvasSvg,
         canvas_json: layer.canvasJson,
         voice_url: voiceUrl,
@@ -502,7 +567,11 @@ export default function ScribbleStudio({
       return
     }
 
-    window.localStorage.removeItem(`scribbl:flat-editor:${shirtId}:${side}`)
+    window.localStorage.removeItem(flatDraftKey(shirtId, side))
+    broadcastTextureUpdated(side as Panel)
+    // Reset the working canvas — the published scribble re-enters the view
+    // through `existingScribbles` after router.refresh().
+    drawingRef.current?.clear()
     setHasDrawingBySide(current => ({ ...current, [side]: false }))
     setDraftJsonBySide(current => ({ ...current, [side]: null }))
     if (outsideDirty) await publishOutsideNotes()
@@ -574,6 +643,66 @@ export default function ScribbleStudio({
     setSelectedObject(null)
   }
 
+  // Restore unpublished outside notes from a previous visit. Runs once per
+  // shirt; the persist effect below keeps the stored copy in sync afterwards.
+  const outsideNotesRestoredRef = useRef(false)
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(outsideDraftKey(shirtId))
+      if (raw) {
+        const parsed = JSON.parse(raw) as { outsideNotes?: OutsideNote[]; outsideReactions?: OutsideStickerReaction[] }
+        if (Array.isArray(parsed.outsideNotes) && parsed.outsideNotes.length > 0) setOutsideNotes(parsed.outsideNotes)
+        if (Array.isArray(parsed.outsideReactions) && parsed.outsideReactions.length > 0) setOutsideReactions(parsed.outsideReactions)
+      }
+    } catch {
+      // Corrupt draft — start clean.
+    }
+    outsideNotesRestoredRef.current = true
+  }, [shirtId])
+
+  // Keep the stored outside-notes draft in sync (publishing empties the
+  // arrays, which clears the stored copy too).
+  useEffect(() => {
+    if (!outsideNotesRestoredRef.current) return
+    try {
+      if (outsideNotes.length > 0 || outsideReactions.length > 0) {
+        window.localStorage.setItem(outsideDraftKey(shirtId), JSON.stringify({ outsideNotes, outsideReactions }))
+      } else {
+        window.localStorage.removeItem(outsideDraftKey(shirtId))
+      }
+    } catch {
+      // Storage may be full or blocked — drafts are best-effort.
+    }
+  }, [outsideNotes, outsideReactions, shirtId])
+
+  // Desktop keyboard shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z or
+  // Ctrl/Cmd+Y redo. Skipped while typing (inputs, textareas, Fabric's
+  // hidden IText textarea) so text editing keeps native undo.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!event.metaKey && !event.ctrlKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const key = event.key.toLowerCase()
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault()
+        drawingRef.current?.undo()
+      } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+        event.preventDefault()
+        drawingRef.current?.redo()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  // Success/info messages dismiss themselves; errors stay until resolved.
+  useEffect(() => {
+    if (!message) return
+    const timer = setTimeout(() => setMessage(null), 4000)
+    return () => clearTimeout(timer)
+  }, [message])
+
   // Switching modes clears any selection so the sheet collapses cleanly on
   // mobile and the inspector falls back to its default state on desktop.
   useEffect(() => {
@@ -604,7 +733,7 @@ export default function ScribbleStudio({
   const showJustSign = activeMode === 'shirt' && !hasDrawing && !signatureMode
 
   const statusMessage = (
-    <div className="min-h-[26px] px-2 text-sm font-semibold">
+    <div role="status" aria-live="polite" className="min-h-[26px] px-2 text-sm font-semibold">
       {error && <p className="text-red-600">{error}</p>}
       {message && <p className="text-green-700">{message}</p>}
       {!error && !message && !canScribble && <p className="text-ink-500">You need permission before publishing a shirt scribble.</p>}
@@ -613,30 +742,35 @@ export default function ScribbleStudio({
 
   return (
     <div className="min-h-screen bg-paper-100 text-ink-900">
-      <ScribbleTopBar
-        currentUserName={currentUserName}
-        canPublish={canPublish}
-        isSaving={isSaving}
-        onPreview={() => setMessage('Preview is already visible in the workspace.')}
-        onSaveDraft={() => saveDraft()}
-        onPublish={sendScribble}
-        zoom={zoom}
-        onZoom={handleZoom}
-        onFitZoom={fitZoom}
-        showJustSign={showJustSign}
-        signatureModeActive={signatureMode}
-        onEnterSignatureMode={enterSignatureMode}
-      />
+      <div className={cn("transition-opacity duration-300", isDrawingActive && "opacity-15 pointer-events-none lg:opacity-100 lg:pointer-events-auto")}>
+        <ScribbleTopBar
+          currentUserName={currentUserName}
+          canPublish={canPublish}
+          isSaving={isSaving}
+          onSaveDraft={() => saveDraft()}
+          onPublish={sendScribble}
+          zoom={zoom}
+          onZoom={handleZoom}
+          onFitZoom={fitZoom}
+          showJustSign={showJustSign}
+          signatureModeActive={signatureMode}
+          onEnterSignatureMode={enterSignatureMode}
+          viewerCount={viewerCount}
+          isConnected={isConnected}
+        />
+      </div>
 
-      {/* Mobile layout (<md): canvas pinned to top, bottom sheet over chrome */}
+      {/* Mobile + tablet layout (<lg): canvas pinned to top, bottom sheet
+          over chrome. The three-column grid only fits at lg+. */}
       <main
-        className="mx-auto block max-w-[1500px] px-3 pt-3 md:hidden"
+        className="mx-auto block max-w-[1500px] px-3 pt-3 lg:hidden"
         style={{
           // Reserve enough room at the bottom for the collapsed sheet (~92px)
           // and the slim mobile BottomBar (~60px + safe-area) so the canvas
           // never disappears behind them.
           paddingBottom: 'calc(160px + env(safe-area-inset-bottom, 0px))',
         }}
+        onPointerDown={handleWorkspacePointerDown}
       >
         <ScribbleWorkspace
           variant="mobile"
@@ -662,6 +796,8 @@ export default function ScribbleStudio({
           outsideReactions={outsideReactions}
           selectedObject={selectedObject}
           onSelectObject={setSelectedObject}
+          onUpdateOutsideNote={updateOutsideNote}
+          onUpdateOutsideReaction={updateOutsideReaction}
           zoom={zoom}
           onZoom={handleZoom}
         />
@@ -671,7 +807,7 @@ export default function ScribbleStudio({
       {/* Desktop layout (md+): three-column studio. In signature mode the
           left toolbar collapses to the SignaturePanel and the right inspector
           slot stays out of the way so the user can focus on the cursive. */}
-      <main className="mx-auto hidden max-w-[1500px] gap-5 px-4 py-5 md:grid lg:grid-cols-[260px_minmax(0,1fr)_340px]">
+      <main className="mx-auto hidden max-w-[1500px] gap-5 px-4 py-5 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_340px]">
         {signatureMode ? (
           <SignaturePanel
             fontStyleId={signatureFontStyleId}
@@ -706,7 +842,7 @@ export default function ScribbleStudio({
           />
         )}
 
-        <div className="min-w-0 space-y-3">
+        <div className="min-w-0 space-y-3" onPointerDown={handleWorkspacePointerDown}>
           <ScribbleWorkspace
             shirtId={shirtId}
             ownerName={ownerName}
@@ -730,6 +866,8 @@ export default function ScribbleStudio({
             outsideReactions={outsideReactions}
             selectedObject={selectedObject}
             onSelectObject={setSelectedObject}
+            onUpdateOutsideNote={updateOutsideNote}
+            onUpdateOutsideReaction={updateOutsideReaction}
             zoom={zoom}
             onZoom={handleZoom}
           />
@@ -780,83 +918,84 @@ export default function ScribbleStudio({
         )}
       </main>
 
-      <ScribbleBottomBar
-        activeMode={activeMode}
-        permissionState={permissionState}
-        zoom={zoom}
-        onZoom={handleZoom}
-        onFitZoom={fitZoom}
-        onClear={clearDraft}
-        onPreview={() => setMessage('Preview is already visible in the workspace.')}
-        onPublish={sendScribble}
-        canPublish={canPublish}
-        isSaving={isSaving}
-        publishLabel={signatureMode ? 'Sign' : undefined}
-      />
-
-      {/* Mobile-only bottom sheet. In signature mode we render a compact
-          SignaturePanel in place of the regular tools so the small screen
-          doesn't get overwhelmed. */}
-      {signatureMode ? (
-        <MobileSignatureSheet
-          ownerName={ownerName}
-          fontStyleId={signatureFontStyleId}
-          color={color}
-          fontSize={signatureFontSize}
-          onFontStyle={setSignatureFontStyleId}
-          onColor={handleColor}
-          onFontSize={setSignatureFontSize}
-          onExit={exitSignatureMode}
+      <div className={cn("transition-opacity duration-300", isDrawingActive && "opacity-15 pointer-events-none lg:opacity-100 lg:pointer-events-auto")}>
+        <ScribbleBottomBar
+          activeMode={activeMode}
+          permissionState={permissionState}
+          zoom={zoom}
+          onZoom={handleZoom}
+          onFitZoom={fitZoom}
+          onClear={clearDraft}
           onPublish={sendScribble}
           canPublish={canPublish}
           isSaving={isSaving}
+          publishLabel={signatureMode ? 'Sign' : undefined}
         />
-      ) : (
-        <ScribbleMobileSheet
-          activeMode={activeMode}
-          tab={mobileTab}
-          onTab={setMobileTab}
-          expanded={mobileSheetExpanded}
-          onExpanded={setMobileSheetExpanded}
-          tool={tool}
-          color={color}
-          brushSize={brushSize}
-          fontStyleId={fontStyleId}
-          highlightEnabled={highlightEnabled}
-          fillShapes={fillShapes}
-          recentColors={recentColors}
-          onTool={handleToolChange}
-          onColor={handleColor}
-          onBrushSize={setBrushSize}
-          onFontStyle={setFontStyleId}
-          onHighlight={setHighlightEnabled}
-          onFillShapes={setFillShapes}
-          onUndo={() => drawingRef.current?.undo()}
-          onRedo={() => drawingRef.current?.redo()}
-          onClearDraft={clearDraft}
-          textDraft={textDraft}
-          onTextDraft={setTextDraft}
-          onInsertText={insertText}
-          onSelectSticker={insertSticker}
-          voiceUrl={voiceUrl}
-          voiceDurationMs={voiceDurationMs}
-          voiceUploading={voiceUploading}
-          onVoiceFile={uploadVoiceFile}
-          onClearVoice={() => {
-            setVoiceUrl(null)
-            setVoiceDurationMs(null)
-          }}
-          ownerFirstName={ownerFirstName}
-          selectedObject={selectedObject}
-          selectedNote={selectedNote}
-          selectedReaction={selectedReaction}
-          onUpdateOutsideNote={updateOutsideNote}
-          onUpdateOutsideReaction={updateOutsideReaction}
-          onDuplicateSelected={duplicateSelected}
-          onDeleteSelected={deleteSelected}
-          onClearSelection={() => setSelectedObject(null)}
-        />
-      )}
+
+        {/* Mobile-only bottom sheet. In signature mode we render a compact
+            SignaturePanel in place of the regular tools so the small screen
+            doesn't get overwhelmed. */}
+        {signatureMode ? (
+          <MobileSignatureSheet
+            ownerName={ownerName}
+            fontStyleId={signatureFontStyleId}
+            color={color}
+            fontSize={signatureFontSize}
+            onFontStyle={setSignatureFontStyleId}
+            onColor={handleColor}
+            onFontSize={setSignatureFontSize}
+            onExit={exitSignatureMode}
+            onPublish={sendScribble}
+            canPublish={canPublish}
+            isSaving={isSaving}
+          />
+        ) : (
+          <ScribbleMobileSheet
+            activeMode={activeMode}
+            tab={mobileTab}
+            onTab={setMobileTab}
+            expanded={mobileSheetExpanded}
+            onExpanded={setMobileSheetExpanded}
+            tool={tool}
+            color={color}
+            brushSize={brushSize}
+            fontStyleId={fontStyleId}
+            highlightEnabled={highlightEnabled}
+            fillShapes={fillShapes}
+            recentColors={recentColors}
+            onTool={handleToolChange}
+            onColor={handleColor}
+            onBrushSize={setBrushSize}
+            onFontStyle={setFontStyleId}
+            onHighlight={setHighlightEnabled}
+            onFillShapes={setFillShapes}
+            onUndo={() => drawingRef.current?.undo()}
+            onRedo={() => drawingRef.current?.redo()}
+            onClearDraft={clearDraft}
+            textDraft={textDraft}
+            onTextDraft={setTextDraft}
+            onInsertText={insertText}
+            onSelectSticker={insertSticker}
+            voiceUrl={voiceUrl}
+            voiceDurationMs={voiceDurationMs}
+            voiceUploading={voiceUploading}
+            onVoiceFile={uploadVoiceFile}
+            onClearVoice={() => {
+              setVoiceUrl(null)
+              setVoiceDurationMs(null)
+            }}
+            ownerFirstName={ownerFirstName}
+            selectedObject={selectedObject}
+            selectedNote={selectedNote}
+            selectedReaction={selectedReaction}
+            onUpdateOutsideNote={updateOutsideNote}
+            onUpdateOutsideReaction={updateOutsideReaction}
+            onDuplicateSelected={duplicateSelected}
+            onDeleteSelected={deleteSelected}
+            onClearSelection={() => setSelectedObject(null)}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -893,7 +1032,7 @@ function MobileSignatureSheet({
 }) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-30 md:hidden"
+      className="pointer-events-none fixed inset-x-0 z-30 lg:hidden"
       style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}
       aria-hidden={false}
     >

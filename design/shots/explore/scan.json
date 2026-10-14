@@ -1,0 +1,183 @@
+[
+  {
+    "name": "a1-shirt",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Archivo": 17,
+        "Caveat": 6
+      },
+      "sizes": [
+        34,
+        30,
+        19,
+        15,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 4,
+      "accentHues": [
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "a2-signing",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Archivo": 5,
+        "Caveat": 1
+      },
+      "sizes": [
+        30,
+        21,
+        19,
+        15,
+        12.5
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 1,
+      "accentHues": [
+        0
+      ],
+      "cards": 1
+    }
+  },
+  {
+    "name": "b1-shirt",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Newsreader": 23,
+        "Caveat": 6
+      },
+      "sizes": [
+        38,
+        30,
+        18,
+        17,
+        15,
+        12.5,
+        12,
+        11
+      ],
+      "weights": [
+        "400",
+        "500",
+        "600",
+        "700"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        216
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "b2-signing",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Newsreader": 6,
+        "Caveat": 1
+      },
+      "sizes": [
+        30,
+        24,
+        17,
+        14.5,
+        12.5,
+        12
+      ],
+      "weights": [
+        "400",
+        "600"
+      ],
+      "leftEdges": 2,
+      "accentHues": [
+        216
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c1-shirt",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 17,
+        "Caveat": 5
+      },
+      "sizes": [
+        62,
+        30,
+        20,
+        16.5,
+        16,
+        15,
+        12.5,
+        11
+      ],
+      "weights": [
+        "400",
+        "600",
+        "700",
+        "800"
+      ],
+      "leftEdges": 5,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 0
+    }
+  },
+  {
+    "name": "c2-signing",
+    "fails": [],
+    "warns": [],
+    "facts": {
+      "fonts": {
+        "Big Shoulders Display": 5,
+        "Caveat": 1
+      },
+      "sizes": [
+        30,
+        27,
+        18,
+        15,
+        12.5
+      ],
+      "weights": [
+        "400",
+        "700",
+        "800"
+      ],
+      "leftEdges": 1,
+      "accentHues": [
+        48,
+        0
+      ],
+      "cards": 0
+    }
+  }
+]

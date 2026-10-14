@@ -1,10 +1,32 @@
 # Scribbl — Documentation Index
 
-> **Status:** v1 build for single launch, scribble day shipping.
-> **Last refresh:** May 2026.
-> **Old docs:** moved to [`docs/archive/`](./archive/) — superseded but kept for history.
+> **2026-08-14 — Rebuild is in [`docs/v2/`](./v2/README.md).**
+> Product, calendar, schema, and storage decisions now live there. This index is the **v1 history**. Do not implement backend or yearbook work from docs 01–23 unless v2 explicitly keeps that decision.
+> **Still current:** [18 Sunlit Lawn](./18-sunlit-lawn-theme-spec.md) until v2 has a UI spec. [20 Guidebook](./20-project-guidebook.md) still maps the *existing* repo.
 
-This is the canonical doc set for the project. Read in order.
+> **v1 status:** frozen. Last refresh May–June 2026.
+> **Older than v1:** [`docs/archive/`](./archive/).
+
+---
+
+## v2 (start here)
+
+| # | Doc |
+|---|---|
+| — | [v2 README](./v2/README.md) |
+| 00 | [From v1 — keep / cut / reverse](./v2/00-from-v1.md) |
+| 01 | [Product](./v2/01-product.md) |
+| 02 | [System map](./v2/02-system-map.md) |
+| 03 | [Storage](./v2/03-storage.md) |
+| 04 | [Schema](./v2/04-schema.md) |
+| 05 | [Build phases](./v2/05-build-phases.md) |
+| 06 | [Open decisions](./v2/06-open-decisions.md) |
+
+---
+
+## v1 (historical)
+
+This was the canonical doc set for the first build. Read in order only to understand what shipped and why.
 
 | # | Doc | Read when |
 |---|---|---|
@@ -28,6 +50,10 @@ This is the canonical doc set for the project. Read in order.
 | 17 | [Design system v2 — theme conversation](./17-design-system-v2-theme-conversation.md) | You want to understand *why* the Sunlit Lawn theme was chosen (rounds 3 → 4 → 5) |
 | 18 | [Sunlit Lawn theme spec & playbook](./18-sunlit-lawn-theme-spec.md) | **Canonical** for the design system: tokens, components, place layer, whiteboard, micro-interactions, school-element vocabulary, implementation phases |
 | 19 | [Founder handoff checklist](./19-handoff-checklist.md) | **Start here if you are the founder.** What you still have to do (14 avatar SVGs, 6 illustrations, friend test) and the exact pre-flight / friend-test / ship-gate checklists. |
+| 20 | [Project guidebook](./20-project-guidebook.md) | **Re-onboarding map.** You came back after a break and forgot where everything is, what assets go where, and how to run / change things. |
+| 21 | [Yearbook Figma Make spec](./21-yearbook-figma-make-spec.md) | You're building Phase 2 — the yearbook grid + profile in Figma Make and wiring it to the scribble database without breaking anything. |
+| 22 | [Audit & security review](./22-audit-and-security-review.md) | Security scan, database audit, UX/UI audit, and onboarding flaws — with severities and concrete fixes. |
+| 23 | [Scribble studio audit](./23-scribble-studio-audit.md) | Deep audit of the drawing/signing stack: P0 bugs fixed 2026-06-10, the draw-while-zoomed / studio-convergence roadmap, and yearbook-readiness items. |
 
 > ⚠ 2026-05-21 — Docs 02/03/04/06 contain ~~strikethroughs~~ that mark passages superseded by doc 08 Round 2. **Doc 02 is also partially superseded by doc 18 (Sunlit Lawn theme) for Phase 1.** When in doubt, doc 18 wins for design.
 

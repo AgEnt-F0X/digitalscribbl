@@ -1,49 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 832" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched campus lawn at golden hour (tablet placeholder)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 832" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Campus lawn at golden hour — warm sky, layered trees, and a park bench under the setting sun">
   <defs>
     <linearGradient id="sky-t" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffe6b3"/>
-      <stop offset="55%" stop-color="#fbd498"/>
-      <stop offset="100%" stop-color="#f4ba79"/>
+      <stop offset="0%" stop-color="#fcd9a8"/>
+      <stop offset="40%" stop-color="#fcce8a"/>
+      <stop offset="70%" stop-color="#f5b56e"/>
+      <stop offset="100%" stop-color="#e8955a"/>
     </linearGradient>
-    <radialGradient id="sun-t" cx="0.8" cy="0.22" r="0.34">
-      <stop offset="0%" stop-color="#fff3d1" stop-opacity="0.95"/>
-      <stop offset="50%" stop-color="#ffdca0" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#fbd498" stop-opacity="0"/>
+    <radialGradient id="sun-glow-t" cx="0.8" cy="0.18" r="0.44">
+      <stop offset="0%" stop-color="#fff8e1" stop-opacity="0.98"/>
+      <stop offset="30%" stop-color="#ffe8b0" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#ffd696" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#fcd9a8" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="lawn-t" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#b9c277"/>
-      <stop offset="100%" stop-color="#86934f"/>
+      <stop offset="0%" stop-color="#c4cd7a"/>
+      <stop offset="50%" stop-color="#a8b45e"/>
+      <stop offset="100%" stop-color="#7d8a47"/>
     </linearGradient>
+    <radialGradient id="foliage-dark-t" cx="0.5" cy="0.4" r="0.5">
+      <stop offset="0%" stop-color="#7a8f4a"/>
+      <stop offset="60%" stop-color="#5a6e32"/>
+      <stop offset="100%" stop-color="#3d4f22"/>
+    </radialGradient>
+    <radialGradient id="foliage-light-t" cx="0.45" cy="0.35" r="0.55">
+      <stop offset="0%" stop-color="#9fb858"/>
+      <stop offset="50%" stop-color="#7a9645"/>
+      <stop offset="100%" stop-color="#5a7430"/>
+    </radialGradient>
   </defs>
   <rect width="1280" height="832" fill="url(#sky-t)"/>
-  <rect width="1280" height="832" fill="url(#sun-t)"/>
-  <path d="M0 540 C 320 490 660 530 980 500 C 1100 490 1220 500 1280 510 L 1280 832 L 0 832 Z" fill="url(#lawn-t)"/>
-  <path d="M0 540 C 320 490 660 530 980 500 C 1100 490 1220 500 1280 510" fill="none" stroke="#5e6a36" stroke-width="2" opacity="0.55" stroke-linecap="round"/>
-  <g opacity="0.45" stroke="#5e6a36" stroke-width="2" stroke-linecap="round">
-    <path d="M80 630 l4 -14"/>
-    <path d="M180 690 l4 -14"/>
-    <path d="M280 640 l4 -14"/>
-    <path d="M380 700 l4 -14"/>
-    <path d="M500 660 l4 -14"/>
-    <path d="M620 720 l4 -14"/>
-    <path d="M740 650 l4 -14"/>
-    <path d="M860 700 l4 -14"/>
-    <path d="M980 640 l4 -14"/>
-    <path d="M1100 700 l4 -14"/>
-    <path d="M1200 660 l4 -14"/>
+  <rect width="1280" height="832" fill="url(#sun-glow-t)"/>
+  <circle cx="1028" cy="150" r="36" fill="#fff8e1" opacity="0.92"/>
+  <circle cx="1028" cy="150" r="28" fill="#fffceb"/>
+  <path d="M0 500 C 280 470 520 500 860 480 C 1120 468 1200 485 1280 476" fill="none" stroke="#5e6a36" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <path d="M0 500 C 280 470 520 500 860 480 C 1120 468 1200 485 1280 476 L 1280 832 L 0 832 Z" fill="url(#lawn-t)"/>
+  <g fill="none" stroke="#5e6a36" stroke-width="1.2" opacity="0.25" stroke-linecap="round">
+    <path d="M60 580 q 3 -10 6 -4 M180 640 q 3 -8 6 -4 M320 560 q 4 -12 8 -6 M460 660 q 3 -8 6 -4 M600 580 q 3 -10 6 -4 M740 640 q 3 -8 6 -4 M880 560 q 4 -12 8 -6 M1020 660 q 3 -8 6 -4 M1160 580 q 3 -10 6 -4 M1220 640 q 3 -8 6 -4"/>
+  </g>
+  <g opacity="0.6">
+    <path d="M920 500 v-16 l10 -6 l10 6 v16" fill="#8aa15c" stroke="#5e6a36" stroke-width="1"/>
   </g>
   <g opacity="0.55">
-    <ellipse cx="920" cy="450" rx="120" ry="92" fill="#8aa15c"/>
-    <ellipse cx="880" cy="420" rx="90" ry="70" fill="#9bb16c"/>
-    <ellipse cx="970" cy="430" rx="80" ry="60" fill="#7e9355"/>
-    <path d="M920 540 v-70" stroke="#5b4524" stroke-width="10" stroke-linecap="round"/>
+    <ellipse cx="910" cy="420" rx="130" ry="100" fill="url(#foliage-light-t)"/>
+    <ellipse cx="860" cy="390" rx="100" ry="76" fill="url(#foliage-dark-t)"/>
+    <ellipse cx="980" cy="400" rx="90" ry="68" fill="url(#foliage-dark-t)"/>
+    <path d="M910 500 v-72" stroke="#4a3520" stroke-width="12" stroke-linecap="round"/>
+    <path d="M900 450 c -8 14 -10 34 0 54" fill="none" stroke="#5b4524" stroke-width="4" stroke-linecap="round"/>
   </g>
   <g opacity="0.35">
-    <ellipse cx="220" cy="480" rx="80" ry="60" fill="#a3b56a"/>
-    <ellipse cx="248" cy="460" rx="60" ry="46" fill="#b6c277"/>
-    <path d="M236 540 v-54" stroke="#5b4524" stroke-width="8" stroke-linecap="round"/>
-  </g>
-  <g opacity="0.25" stroke="#7a6238" stroke-width="2.5" fill="none">
-    <path d="M520 490 c 26 -16 70 -18 110 0 c 40 18 90 14 124 -2" stroke-linecap="round"/>
+    <ellipse cx="220" cy="450" rx="90" ry="68" fill="url(#foliage-light-t)"/>
+    <ellipse cx="250" cy="430" rx="66" ry="50" fill="url(#foliage-dark-t)"/>
+    <path d="M236 500 v-58" stroke="#4a3520" stroke-width="10" stroke-linecap="round"/>
   </g>
 </svg>

@@ -82,15 +82,33 @@ export function normalizeAvatarConfig(input: unknown): UserAvatarConfig {
   const value = input as Partial<UserAvatarConfig>
   const presetItem = getAvatarPreset(value.presetId)
   const defaults = createDefaultAvatarConfig(presetItem.id)
+
+  const skinToneConfig = normalizeSkinToneConfig(value.skinTone)
+
   return {
     ...defaults,
     skinToneId: typeof value.skinToneId === 'string' ? value.skinToneId : defaults.skinToneId,
+    skinTone: skinToneConfig,
     frontFaceImageUrl: typeof value.frontFaceImageUrl === 'string' ? value.frontFaceImageUrl : undefined,
     backHairImageUrl: typeof value.backHairImageUrl === 'string' ? value.backHairImageUrl : undefined,
+    headSource: typeof value.headSource === 'string' ? value.headSource : undefined,
     frontFaceTransform: normalizeTransform(value.frontFaceTransform, presetItem.faceDefault),
     backHairTransform: normalizeTransform(value.backHairTransform, presetItem.backHairDefault),
     lockedAt: typeof value.lockedAt === 'string' ? value.lockedAt : undefined,
   }
+}
+
+export function normalizeSkinToneConfig(input: unknown): { depth: number; undertone: number; hex: string } | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const val = input as { depth?: unknown; undertone?: unknown; hex?: unknown }
+  if (typeof val.depth === 'number' && typeof val.hex === 'string') {
+    return {
+      depth: Math.max(0, Math.min(100, Math.round(val.depth))),
+      undertone: typeof val.undertone === 'number' ? Math.max(-50, Math.min(50, Math.round(val.undertone))) : 0,
+      hex: /^#[0-9a-f]{6}$/i.test(val.hex) ? val.hex : '#E8BD92',
+    }
+  }
+  return undefined
 }
 
 export function normalizeTransform(input: unknown, fallback: Transform2D): Transform2D {

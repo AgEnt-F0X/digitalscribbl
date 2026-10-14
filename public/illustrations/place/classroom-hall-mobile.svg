@@ -1,49 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 828 1474" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sketched classroom hall (mobile portrait placeholder)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 828 1474" preserveAspectRatio="xMidYMid slice" role="img" aria-label="University classroom hall — wooden desks, a blackboard, and tall windows in warm afternoon light">
   <defs>
     <linearGradient id="wall-cm" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff1cf"/>
-      <stop offset="55%" stop-color="#f5dfaa"/>
+      <stop offset="0%" stop-color="#fcedd4"/>
+      <stop offset="50%" stop-color="#f5dfaa"/>
       <stop offset="100%" stop-color="#e8c890"/>
     </linearGradient>
     <linearGradient id="floor-cm" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#d6b985"/>
       <stop offset="100%" stop-color="#a98c5b"/>
     </linearGradient>
-    <radialGradient id="window-cm" cx="0.5" cy="0.45" r="0.55">
+    <radialGradient id="window-cm" cx="0.5" cy="0.5" r="0.6">
       <stop offset="0%" stop-color="#fff6d9" stop-opacity="0.9"/>
       <stop offset="100%" stop-color="#fff6d9" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="board-cm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a4a2a"/>
+      <stop offset="100%" stop-color="#1a351a"/>
+    </linearGradient>
   </defs>
   <rect width="828" height="1474" fill="url(#wall-cm)"/>
-  <path d="M0 980 L 828 980 L 828 1474 L 0 1474 Z" fill="url(#floor-cm)"/>
-  <path d="M0 0 L 414 640 L 828 0 Z" fill="#f8e6b7" opacity="0.55"/>
-  <g stroke="#7a6238" stroke-width="2" fill="none" opacity="0.65">
-    <path d="M0 0 L 414 640" stroke-linecap="round"/>
-    <path d="M828 0 L 414 640" stroke-linecap="round"/>
-    <path d="M0 980 L 414 640" stroke-linecap="round"/>
-    <path d="M828 980 L 414 640" stroke-linecap="round"/>
+  <path d="M0 940 L 828 940 L 828 1474 L 0 1474 Z" fill="url(#floor-cm)"/>
+  <path d="M0 940 L 828 940" stroke="#7a6238" stroke-width="1.5" opacity="0.3"/>
+  <path d="M0 0 L 414 620 L 828 0 Z" fill="#f8e6b7" opacity="0.5"/>
+  <g stroke="#7a6238" stroke-width="2" fill="none" opacity="0.55">
+    <path d="M0 0 L 414 620" stroke-linecap="round"/>
+    <path d="M828 0 L 414 620" stroke-linecap="round"/>
+    <path d="M0 940 L 414 620" stroke-linecap="round"/>
+    <path d="M828 940 L 414 620" stroke-linecap="round"/>
   </g>
-  <g stroke="#7a6238" stroke-width="1.6" fill="none" opacity="0.42">
-    <path d="M0 1474 L 414 640"/>
-    <path d="M828 1474 L 414 640"/>
-    <path d="M200 1474 L 414 640"/>
-    <path d="M628 1474 L 414 640"/>
+  <g stroke="#7a6238" stroke-width="1.4" fill="none" opacity="0.35">
+    <path d="M0 1474 L 414 620"/>
+    <path d="M828 1474 L 414 620"/>
+    <path d="M200 1474 L 414 620"/>
+    <path d="M628 1474 L 414 620"/>
+  </g>
+  <g opacity="0.75">
+    <rect x="250" y="520" width="328" height="200" fill="url(#board-cm)" rx="6"/>
+    <rect x="250" y="520" width="328" height="200" fill="none" stroke="#5a7a5a" stroke-width="4" rx="6"/>
+    <path d="M280 580 q 60 18 120 10 t 150 22" stroke="#fff" stroke-width="2" fill="none" opacity="0.3" stroke-linecap="round"/>
+    <path d="M300 610 q 50 12 100 6 t 120 18" stroke="#fff" stroke-width="1.5" fill="none" opacity="0.2" stroke-linecap="round"/>
+    <rect x="266" y="536" width="296" height="14" fill="#3a5a3a" rx="2"/>
   </g>
   <g opacity="0.7">
-    <rect x="262" y="540" width="304" height="200" fill="#fbf8ee" stroke="#8a93a0" stroke-width="6" rx="4"/>
-    <rect x="278" y="556" width="272" height="168" fill="url(#window-cm)"/>
-    <path d="M280 660 q 60 -28 110 -10 t 160 -16" stroke="#2563eb" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
-    <path d="M310 700 l 50 -12 l -18 22 z" fill="#d83f6b" opacity="0.45"/>
+    <rect x="280" y="544" width="268" height="160" fill="url(#window-cm)"/>
   </g>
   <g opacity="0.55" stroke="#5b4524" stroke-width="2.4" fill="#e6cf9a">
-    <rect x="80" y="990" width="220" height="120" rx="6"/>
-    <rect x="80" y="990" width="220" height="34" rx="6" fill="#caa56a"/>
-    <line x1="90" y1="1110" x2="90" y2="1240" stroke-width="6" stroke-linecap="round"/>
-    <line x1="290" y1="1110" x2="290" y2="1240" stroke-width="6" stroke-linecap="round"/>
-    <rect x="540" y="990" width="220" height="120" rx="6"/>
-    <rect x="540" y="990" width="220" height="34" rx="6" fill="#caa56a"/>
-    <line x1="550" y1="1110" x2="550" y2="1240" stroke-width="6" stroke-linecap="round"/>
-    <line x1="750" y1="1110" x2="750" y2="1240" stroke-width="6" stroke-linecap="round"/>
-    <rect x="310" y="1010" width="200" height="100" rx="6"/>
+    <rect x="60" y="950" width="240" height="130" rx="6"/>
+    <rect x="60" y="950" width="240" height="34" rx="6" fill="#caa56a"/>
+    <line x1="72" y1="1080" x2="72" y2="1200" stroke-width="6" stroke-linecap="round"/>
+    <line x1="288" y1="1080" x2="288" y2="1200" stroke-width="6" stroke-linecap="round"/>
+    <rect x="530" y="950" width="240" height="130" rx="6"/>
+    <rect x="530" y="950" width="240" height="34" rx="6" fill="#caa56a"/>
+    <line x1="542" y1="1080" x2="542" y2="1200" stroke-width="6" stroke-linecap="round"/>
+    <line x1="758" y1="1080" x2="758" y2="1200" stroke-width="6" stroke-linecap="round"/>
+    <rect x="290" y="980" width="220" height="110" rx="6"/>
+    <rect x="290" y="980" width="220" height="30" rx="6" fill="#caa56a"/>
+    <line x1="300" y1="1090" x2="300" y2="1160" stroke-width="5" stroke-linecap="round"/>
+    <line x1="500" y1="1090" x2="500" y2="1160" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.3">
+    <line x1="414" y1="140" x2="414" y2="110" stroke="#7a6238" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="414" cy="160" r="26" fill="none" stroke="#7a6238" stroke-width="2.5"/>
+    <circle cx="414" cy="160" r="3" fill="#7a6238"/>
+    <line x1="414" y1="160" x2="414" y2="140" stroke="#7a6238" stroke-width="2" stroke-linecap="round"/>
+    <line x1="414" y1="160" x2="430" y2="170" stroke="#7a6238" stroke-width="2" stroke-linecap="round"/>
   </g>
 </svg>

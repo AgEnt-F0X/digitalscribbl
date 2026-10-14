@@ -54,12 +54,20 @@ export interface SkinTone {
   hex: string
 }
 
+export interface SkinToneConfig {
+  depth: number    // 0–100
+  undertone: number // -50–50
+  hex: string
+}
+
 export interface UserAvatarConfig {
   presetId: AvatarPresetId
   skinToneId: string
+  skinTone?: SkinToneConfig
   frontFaceImageUrl?: string
   backHairImageUrl?: string
   frontFaceTransform: Transform2D
   backHairTransform: Transform2D
+  headSource?: 'upload' | 'skipped'
   lockedAt?: string
 }
