@@ -105,6 +105,9 @@ export const ROUTES = {
   onboarding: '/onboarding',
   dashboard:  '/dashboard',
   profile:    (id: string) => `/profile/${id}`,
+  // The studio is keyed by shirt, not by person: a shirt's access mode is what
+  // decides who may sign it, so the studio URL has to carry the shirt id.
+  shirtScribble: (shirtId: string) => `/shirts/${shirtId}/scribble`,
   explore:    '/explore',
   groups:     '/groups',
   group:      (id: string) => `/groups/${id}`,

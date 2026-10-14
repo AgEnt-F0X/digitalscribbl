@@ -9,7 +9,7 @@ import {
   SHIRT_COORDINATE_SPACE,
   SHIRT_TEMPLATE_ID,
 } from '@/lib/utils/shirtTemplate'
-import { canAttemptScribble } from '@/lib/utils/safetyAccess'
+import { checkShirtAccess, describeAccessFailure } from '@/lib/identity/access'
 import { createFixedWindowRateLimiter, rateLimitResponseHeaders } from '@/lib/utils/rateLimit'
 import { getPhase, isScribbleOpen } from '@/lib/utils/phase'
 import { getPlatformFlags } from '@/lib/utils/platformFlags'
@@ -202,6 +202,8 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Get shirt + active box claim in parallel ─────────────────
+  // `batch_id` is no longer fetched for access: batch is a browsing filter and
+  // never a gate, so nobody is refused for being in a different section.
   const [{ data: shirt }, { data: scribblerProfile }, { data: owner }, { data: claim }] = await Promise.all([
     db
       .from('shirts')
@@ -211,12 +213,14 @@ export async function POST(req: NextRequest) {
       .single(),
     db
       .from('users')
-      .select('batch_id, is_suspended, is_guest')
+      .select('is_suspended, is_guest')
       .eq('id', user.id)
       .single(),
+    // Existence check only. The mode, circle, and block all come from
+    // checkShirtAccess below, which is the single reader of the access model.
     db
       .from('users')
-      .select('shirt_permission, batch_id')
+      .select('id')
       .eq('id', owner_id)
       .single(),
     db
@@ -248,35 +252,29 @@ export async function POST(req: NextRequest) {
     // Continue — in-flight scribble is honored as the "last one".
   }
 
-  // ── Permission check ─────────────────────────────────────────
-  const { data: requestRecord } = await db
-    .from('scribble_requests')
-    .select('status')
-    .eq('requester_id', user.id)
-    .eq('owner_id', owner_id)
-    .maybeSingle()
+  // ── Permission check (one-door model, doc 07) ───────────────
+  // Replaces the v1 `users.shirt_permission` matrix. Batch is a browsing
+  // filter and never an access gate: a student is never refused for being in
+  // a different section. Safety is per-shirt (`visibility`) plus one
+  // unconditional per-person `block`.
+  const accessCheck = await checkShirtAccess(db, shirt.id, user.id)
 
-  const sameBatch = Boolean(
-    owner.batch_id && scribblerProfile?.batch_id && owner.batch_id === scribblerProfile.batch_id,
-  )
-  const approvedRequest = requestRecord?.status === 'approved'
-
-  // Guests bypass batch matching but must have an approved request OR
-  // the permission must be 'open' (a direct link is enough).
-  const isGuest = Boolean(scribblerProfile?.is_guest)
-  const guestAllowed = isGuest && (owner.shirt_permission === 'open' || approvedRequest)
-
-  if (!guestAllowed && !canAttemptScribble({
-    isOwner: false,
-    permission: owner.shirt_permission,
-    sameBatch,
-    approvedRequest,
-  })) {
-    const message = owner.shirt_permission === 'batch_only' && !sameBatch
-      ? 'This shirt only accepts signatures from the same batch'
-      : 'You need permission to sign this shirt'
-    return NextResponse.json({ error: message, code: 'FORBIDDEN' }, { status: 403 })
+  if (!accessCheck.allowed) {
+    const status = accessCheck.reason === 'shirt_not_found' ? 404 : 403
+    return NextResponse.json(
+      {
+        error: describeAccessFailure(accessCheck.reason),
+        code: 'FORBIDDEN',
+        reason: accessCheck.reason,
+      },
+      { status },
+    )
   }
+
+  // `approval` mode: the scribbler draws immediately and keeps seeing her own
+  // work. Only the reveal waits, so the write always succeeds and the row is
+  // held as `pending` until the owner approves it.
+  const needsApproval = accessCheck.needsApproval
 
   // ── Platform-level checks ────────────────────────────────────
   const { data: settings } = await db
@@ -318,6 +316,9 @@ export async function POST(req: NextRequest) {
       coordinate_space:   normalizedCoordinateSpace,
       canvas_svg:         sanitizedSvg.svg,
       canvas_json:        canvas_json as Parameters<typeof db.from>[0] extends never ? never : unknown,
+      // On an `approval` shirt the row lands as `pending` and is visible only to
+      // its author and the shirt owner until the owner approves the reveal.
+      approval_status:    needsApproval ? 'pending' : 'approved',
       voice_url:          voice_url ?? null,
       voice_duration_ms:  voice_duration_ms ?? null,
     })
@@ -343,6 +344,11 @@ export async function POST(req: NextRequest) {
     .eq('shirt_id', shirt.id)
     .eq('panel', panel)
     .eq('is_hidden', false)
+    // Trap 1 from doc 08: this is the SERVICE-ROLE client, so the RLS policy
+    // that hides pending scribbles does not apply. Filter explicitly or a
+    // not-yet-approved scribble would silently count toward fullness and leak
+    // its footprint into public occupancy.
+    .eq('approval_status', 'approved')
 
   const newOccupancy = calculateOccupancy(existingScribbles ?? [], SHIRT_W, SHIRT_H)
 
@@ -376,8 +382,10 @@ export async function POST(req: NextRequest) {
 
   await db.from('notifications').insert({
     user_id:             owner_id,
-    type:                'scribble_received',
-    title:               `${displayName} signed your shirt`,
+    type:                needsApproval ? 'scribble_pending_approval' : 'scribble_received',
+    // Trap 2 from doc 08: telling the owner someone "signed" when the row is
+    // still pending would be false. The owner needs to know it is a decision.
+    title:               needsApproval ? `${displayName} drew on your shirt — waiting for you` : `${displayName} signed your shirt`,
     body:                panel === 'front' ? 'On the front' : panel === 'back' ? 'On the back' : 'On the sleeves',
     related_user_id:     user.id,
     related_shirt_id:    shirt.id,
@@ -388,7 +396,13 @@ export async function POST(req: NextRequest) {
     success:           true,
     scribble_id:       newScribble.id,
     occupancy:         newOccupancy,
-    thank_you_message: ownerProfile?.thank_you_message ?? 'Thanks for signing my shirt ❤️',
+    // `pending` tells the studio to keep the drawing but swap the confirmation
+    // copy — a thank-you message implies the work is already live, which on an
+    // approval shirt it is not yet.
+    approval_status:   needsApproval ? 'pending' : 'approved',
+    thank_you_message: needsApproval
+      ? null
+      : ownerProfile?.thank_you_message ?? 'Thanks for signing my shirt ❤️',
     owner_name:        ownerProfile?.display_name ?? null,
   })
 }

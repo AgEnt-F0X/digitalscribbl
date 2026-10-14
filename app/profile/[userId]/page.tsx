@@ -31,7 +31,9 @@ import {
 } from '@/components/marginalia/HeroStickerNotes'
 import { ROUTES } from '@/lib/constants'
 import { getPublicSiteUrl } from '@/lib/utils/siteUrl'
-import { canAttemptScribble } from '@/lib/utils/safetyAccess'
+import { canSignShirt } from '@/lib/identity/signing'
+import { loadShirtAccess } from '@/lib/identity/access'
+import { createServiceClient } from '@/lib/supabase/server'
 import { buildActivityItems, type ActivityReactionInput, type ActivityScribbleInput, type ActivityUserInput } from '@/lib/utils/activity'
 import { getPlatformFlags } from '@/lib/utils/platformFlags'
 import type { Panel } from '@/lib/supabase/types'
@@ -151,33 +153,26 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     : { data: [] }
 
   let canScribble = false
-  let permissionState: 'can' | 'request' | 'locked' | 'own' = 'locked'
+  let permissionState: 'can' | 'locked' | 'own' | 'needs_approval' = 'locked'
 
   if (isOwner) {
     permissionState = 'own'
-  } else if (!activeShirt?.is_locked && target.shirt_permission !== 'locked') {
-    if (target.shirt_permission === 'open') {
-      canScribble = true
-      permissionState = 'can'
-    } else {
-      const [{ data: me }, { data: req }] = await Promise.all([
-        supabase.from('users').select('batch_id').eq('id', currentUser.id).single(),
-        supabase
-        .from('scribble_requests')
-        .select('status')
-        .eq('requester_id', currentUser.id)
-        .eq('owner_id', targetId)
-        .maybeSingle(),
-      ])
-      const sameBatch = Boolean(target.batch_id && me?.batch_id && target.batch_id === me.batch_id)
-      const approvedRequest = req?.status === 'approved'
-      canScribble = canAttemptScribble({
+  } else if (activeShirt && !activeShirt.is_locked) {
+    // One-door model (doc 07). The shirt's mode decides; batch is a browsing
+    // filter and is never consulted here, so a classmate in another section is
+    // never refused. `request` is gone — an approval shirt still lets you draw.
+    const access = await loadShirtAccess(await createServiceClient(), activeShirt.id, currentUser.id)
+    if (access) {
+      const decision = canSignShirt({
+        shirt: { visibility: access.visibility },
         isOwner: false,
-        permission: target.shirt_permission,
-        sameBatch,
-        approvedRequest,
+        isBlocked: access.isBlocked,
+        isCircleMember: access.isCircleMember,
       })
-      permissionState = canScribble ? 'can' : 'request'
+      canScribble = decision.allowed
+      permissionState = decision.allowed
+        ? (decision.needsApproval ? 'needs_approval' : 'can')
+        : 'locked'
     }
   }
 
@@ -337,12 +332,14 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                 Customize look
               </Link>
             )}
-            {!isOwner && permissionState === 'request' && (
-              <RequestScribbleButton ownerId={targetId} />
+            {!isOwner && permissionState === 'needs_approval' && canScribble && activeShirt && (
+              <Link href={ROUTES.shirtScribble(activeShirt.id)} className="pencil-button">
+                Scribble on this shirt
+              </Link>
             )}
             {!isOwner && permissionState === 'locked' && (
               <span className="inline-flex items-center rounded-xl border border-[color:var(--line-soft)] bg-white/85 px-3 py-2 text-xs text-ink-500">
-                Shirt is locked
+                Not taking signatures right now
               </span>
             )}
           </div>

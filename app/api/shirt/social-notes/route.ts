@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireApiUser } from '@/lib/auth/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { canAttemptScribble } from '@/lib/utils/safetyAccess'
+import { checkShirtAccess, describeAccessFailure } from '@/lib/identity/access'
 
 export const runtime = 'nodejs'
 
@@ -71,33 +71,18 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!shirt || !shirt.owner_id) return NextResponse.json({ error: 'Shirt not found' }, { status: 404 })
-  if (shirt.owner_id === auth.user.id) return NextResponse.json({ error: 'You cannot sign your own shirt' }, { status: 403 })
   if (shirt.is_locked) return NextResponse.json({ error: 'This shirt is locked' }, { status: 423 })
 
-  const [{ data: owner }, { data: scribbler }, { data: request }] = await Promise.all([
-    db.from('users').select('shirt_permission, batch_id, is_suspended').eq('id', shirt.owner_id).single(),
-    db.from('users').select('batch_id, is_suspended, is_guest').eq('id', auth.user.id).single(),
-    db.from('scribble_requests')
-      .select('status')
-      .eq('requester_id', auth.user.id)
-      .eq('owner_id', shirt.owner_id)
-      .maybeSingle(),
-  ])
+  // One-door model (doc 07). Same resolver as scribble placement, so a note and
+  // a scribble can never disagree about who may write on a shirt.
+  const accessCheck = await checkShirtAccess(db, shirt.id, auth.user.id)
 
-  if (!owner || !scribbler || owner.is_suspended || scribbler.is_suspended) {
-    return NextResponse.json({ error: 'Signing is not available' }, { status: 403 })
+  if (!accessCheck.allowed) {
+    return NextResponse.json(
+      { error: describeAccessFailure(accessCheck.reason) },
+      { status: accessCheck.reason === 'shirt_not_found' ? 404 : 403 },
+    )
   }
-
-  const sameBatch = Boolean(owner.batch_id && scribbler.batch_id && owner.batch_id === scribbler.batch_id)
-  const approvedRequest = request?.status === 'approved'
-  const canScribble = canAttemptScribble({
-    isOwner: false,
-    permission: owner.shirt_permission,
-    sameBatch: scribbler.is_guest ? false : sameBatch,
-    approvedRequest,
-  })
-
-  if (!canScribble) return NextResponse.json({ error: 'You need permission to leave a note' }, { status: 403 })
 
   const { data: inserted, error } = await db
     .from('shirt_social_notes')
