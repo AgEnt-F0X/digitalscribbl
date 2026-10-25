@@ -1,0 +1,13 @@
+Explore a different STRUCTURE for this profile page - do not change the visual system, the colors, the typefaces or the tokens. Keep the same content and the same copy: Scribbl wordmark, notification bell, avatar, AARAV SHARMA, B.TECH COMPUTER SCIENCE & ENGINEERING / CLASS OF 2026, SCRIBBLED BY 17 FRIENDS, Sign this shirt, THE SHIRT, SHIRT 1, SHIRT 2, FRONT, BACK, the signed T-shirt, 24 MARKS / 17 FRIENDS / SHIRT 1 OF 2, HOW MUCH OF THE SHIRT IS SIGNED, FRONT 62%, BACK 28%, IN THE YEARBOOK, the yearbook card, SEE A PREVIEW, RECENT ACTIVITY with Meghna Nair, Arjun Menon, Mayank Iyer, Rohan Bhatt, REPORT AN ISSUE, SCRIBBL / CLASS OF 2026.
+
+THE STRUCTURE TO EXPLORE: THE GALLERY. The page becomes one continuous image-led surface with no boxes at all.
+
+- The T-shirt hero bleeds off the top edge of the screen: full-bleed to the left, right and top edges, with the avatar-and-shirt artwork large and cropped by the viewport rather than floating in a centred card. There is no white card behind it and no border. The name AARAV SHARMA and the two mono lines sit directly on the artwork area below it, not on a card.
+- The Sign this shirt button stays directly under the name.
+- Everything below the hero is a single typographic column with NO cards, NO bordered boxes, NO framed panels. Sections are separated only by a 1px hairline rule and 32px of space, and the whole column is flush with the screen edges - content sits directly on the page ground, with only the standard page margin.
+- THE SHIRT section: the FRONT and BACK tabs and the SHIRT 1 / SHIRT 2 tabs stay, but the signed T-shirt is shown at full column width directly on the page ground with no card and no border around it - just the white shirt shape on the paper ground, with its marker marks on the fabric.
+- HOW MUCH OF THE SHIRT IS SIGNED: the two progress rows stay, but each bar is now full column width, a 4px track with no rounding.
+- IN THE YEARBOOK: the card is gone. The content becomes plain ruled rows - a name row, a programme row, a sentence row, and SEE A PREVIEW as a text link on its own row. No border, no fill.
+- RECENT ACTIVITY: the four rows stay as ruled rows with the small illustrated avatar thumbnail on the left, no boxes.
+
+Use ONLY the fonts, colors, spacing, radius, shadow and component styles defined in the design system. Do not introduce any fonts, colors, or visual styles not in the design system. Gold appears nowhere. No emoji, no photographs, no stickers, no doodles, no gradients, no rounded shapes. Every person is a flat vector illustration. Keep the single soft shadow under the hero artwork only.

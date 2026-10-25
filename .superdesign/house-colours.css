@@ -1,0 +1,326 @@
+/* ==========================================================================
+   Scribbl — Design System v4 "House Colours"
+   --------------------------------------------------------------------------
+   The direction the founder asked for: BounceBee (hand-drawn but systemic)
+   + Softly (warm, grainy, breathing room), applied to the House Colours
+   concept that already won the team's own 4-round exploration (design/shots/r4)
+   and was never shipped.
+
+   What is NEW here vs. the r4 exploration:
+     1. BounceBee's discipline — ONE hand-drawn device (the scribble stroke)
+        doing all structural work, instead of a hand-drawn border everywhere.
+     2. Softly's warmth — a real grain layer, more air, lower-velocity motion.
+     3. One shape language — a single radius, so shape carries no noise.
+     4. The field system — each student's fabric colour IS their screen.
+
+   Token values marked [r4] are the exact values from design/explore.html
+   (.c rules) and design/shots/r4. They are proven; do not drift them.
+   ========================================================================== */
+
+/* ── 1. The field ───────────────────────────────────────────────────────────
+   The student's shirt fabric colour becomes the screen ground. The field
+   deepens one step every time a mark is published — "the shirt fills".
+   That progression is the product's signature moment. See the storyboard
+   frame at design/shots/r4/08-c3-storyboard.png.                        */
+:root {
+  --field-marigold: #E29A2E;   /* [r4] default field */
+  --field-cobalt:   #2F5FA8;   /* [r4] second field  */
+  --field-forest:   #3F6B4A;   /* [r4] third field   */
+  --field-oxblood:  #7A2E2E;   /* [r4] fourth field  */
+  --field-night:    #191410;   /* [r4] night field   */
+
+  /* Ink on the field. Two levels only. */
+  --ink-900: #191410;           /* [r4] primary on field */
+  --ink-700: #4A3A20;           /* [r4] secondary on field */
+  --ink-500: #6E5A3C;           /* [r4] tertiary on field */
+
+  /* Paper — the white shirt, and any surface that sits on the field. */
+  --paper-50:  #FAF7F0;         /* [r4] */
+  --paper-100: #FFFFFF;         /* the shirt */
+  --paper-200: #F2EEE4;         /* mats, insets */
+  --paper-300: #E4DED0;
+
+  /* Accent — the live-presence red. One use per screen. */
+  --live: #D63830;              /* [r4] the "3 HERE NOW" dot */
+
+  /* Brand — the logo and the auth surfaces only. NOT a UI accent. */
+  --brand: #6f54df;
+
+  /* Marker palette — CONTENT ONLY. The ink the user draws with. */
+  --marker-black:  #2D2923;
+  --marker-red:    #E8453C;
+  --marker-blue:   #2563EB;
+  --marker-green:  #5F8B48;
+  --marker-purple: #7C3AED;
+  --marker-orange: #EA580C;
+  --marker-yellow: #D97706;
+  --marker-teal:   #0891B2;
+
+  /* Status — semantic only. */
+  --success: #3F6B4A;
+  --warning: #9A6510;
+  --danger:  #B3261E;
+  --info:    #2F5FA8;
+}
+
+/* ── 2. Type ───────────────────────────────────────────────────────────────
+   Three roles, one job each. This is the fix for the current app's biggest
+   problem: three handwritten families competing to be a heading.            */
+:root {
+  --font-display: 'Big Shoulders Display', 'Archivo', sans-serif;  /* [r4] */
+  --font-body:    'Archivo', system-ui, sans-serif;                /* [r4] */
+  --font-hand:    'Caveat', cursive;   /* CONTENT ONLY: notes, names, marks */
+  --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* .t-display — the one big thing on a screen. Uppercase. */
+.t-display {
+  font-family: var(--font-display);
+  font-size: 56px; font-weight: 800; line-height: 0.92;
+  letter-spacing: -0.005em; text-transform: uppercase;
+}
+.t-title {
+  font-family: var(--font-display);
+  font-size: 27px; font-weight: 800; line-height: 1;
+  letter-spacing: 0.01em; text-transform: uppercase;
+}
+.t-heading {
+  font-family: var(--font-display);
+  font-size: 17px; font-weight: 700; line-height: 1.15;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.t-body {
+  font-family: var(--font-body);
+  font-size: 16px; font-weight: 600; line-height: 1.35;
+}
+/* .t-meta — the mono/condensed caps line: dates, counts, status. */
+.t-meta {
+  font-family: var(--font-display);
+  font-size: 12.5px; font-weight: 700; line-height: 1.2;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-700);
+}
+/* .t-note — a person's handwriting. ONLY for content the user wrote. */
+.t-note {
+  font-family: var(--font-hand);
+  font-size: 16.5px; line-height: 1; color: var(--ink-900);
+}
+.t-note__sign {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-700); margin-top: 2px;
+}
+
+/* ── 3. Shape, depth, texture ────────────────────────────────────────────── */
+:root {
+  /* ONE radius. Shape carries no information beyond "this is a surface". */
+  --radius: 12px;               /* [r4] */
+  --radius-sm: 8px;
+
+  /* Hard offset shadows. Things sit ON the field, they do not float. */
+  --shadow-press: 9px 10px 0 rgba(25, 20, 16, 0.16);   /* [r4] the shirt */
+  --shadow-card:  4px 5px 0 rgba(25, 20, 16, 0.16);    /* [r4] whiteboard card */
+  --shadow-button: 0 0 0 rgba(0,0,0,0);
+
+  /* The weave — a 4px fabric texture at 5%. [r4] */
+  --weave:
+    repeating-linear-gradient(0deg, var(--ink-900) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, var(--ink-900) 0 1px, transparent 1px 4px);
+}
+
+/* ── 4. The field surface ────────────────────────────────────────────────── */
+.field {
+  position: relative;
+  min-height: 100vh;
+  background: var(--field-marigold);
+  color: var(--ink-900);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+.field[data-field='cobalt']  { background: var(--field-cobalt); }
+.field[data-field='forest']  { background: var(--field-forest); }
+.field[data-field='oxblood'] { background: var(--field-oxblood); }
+.field[data-field='night']   { background: var(--field-night); color: var(--paper-50); }
+.field[data-field='night'] .t-meta { color: rgba(250, 247, 240, 0.72); }
+
+/* The weave — the field is fabric. */
+.field::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: var(--weave);
+  opacity: 0.05; pointer-events: none;
+}
+/* Softly's grain — the analog layer. Keep it faint; the weave is primary. */
+.field::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  opacity: 0.06; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── 5. The scribble stroke — the ONE hand-drawn device ────────────────────
+   BounceBee's signature curve, adapted. It does structural work and nothing
+   else: it underlines a heading, marks the active tab, signs off a section,
+   frames the shirt. It is never sprinkled as decoration.                 */
+.scribble {
+  display: block; width: 100%; height: 8px;
+  color: currentColor;
+}
+.scribble path {
+  fill: none; stroke: currentColor;
+  stroke-width: 2.5; stroke-linecap: round;
+  stroke-dasharray: 200; stroke-dashoffset: 200;
+  animation: scribble-draw 520ms var(--ease-out, cubic-bezier(.2,.8,.2,1)) forwards;
+}
+@keyframes scribble-draw { to { stroke-dashoffset: 0; } }
+
+/* The active tab indicator. */
+.tabbar__item[aria-current='page'] .scribble { color: var(--ink-900); height: 6px; }
+
+/* ── 6. Surfaces ──────────────────────────────────────────────────────────── */
+.plate {
+  background: var(--paper-50);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.plate--shirt {
+  background: var(--paper-100);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-press);
+  display: grid; place-items: center;
+  padding: var(--s5, 24px);
+}
+
+/* The whiteboard survives — as a hard-shadowed card on the field, with the
+   handwriting used only for the personal annotation, never for chrome. */
+.whiteboard {
+  background: var(--paper-50);
+  border: 1.5px solid var(--ink-900);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: var(--s4, 16px) var(--s5, 24px);
+}
+.whiteboard__headline {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.whiteboard__note { margin-top: 4px; }
+
+/* ── 7. Buttons — [r4] exact ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 54px; padding: 0 var(--s5, 24px);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-size: 19px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  border: none; cursor: pointer;
+  transition: transform 120ms cubic-bezier(.2,.8,.2,1), box-shadow 120ms cubic-bezier(.2,.8,.2,1);
+}
+.btn--primary { background: var(--ink-900); color: var(--paper-50); }
+.btn--primary:active { transform: translate(2px, 2px); }
+.btn--secondary {
+  background: transparent; color: var(--ink-900);
+  border: 1.5px solid var(--ink-900);
+  min-height: 50px; font-size: 16px;
+}
+.btn--secondary:active { transform: translate(2px, 2px); }
+.btn--quiet {
+  background: none; border: none; min-height: 44px;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; text-decoration: underline;
+  text-underline-offset: 3px; color: var(--ink-900);
+}
+
+/* ── 8. Bottom nav — [r4] exact ─────────────────────────────────────────── */
+.tabbar {
+  position: fixed; inset-inline: 0; bottom: 0; z-index: 30;
+  height: 66px; display: grid; grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  background: var(--field-marigold);
+  border-top: 1.5px solid rgba(25, 20, 16, 0.28);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.tabbar[data-field='cobalt']  { background: var(--field-cobalt); }
+.tabbar[data-field='forest']  { background: var(--field-forest); }
+.tabbar[data-field='oxblood'] { background: var(--field-oxblood); }
+.tabbar[data-field='night']   { background: var(--field-night); border-top-color: rgba(250,247,240,.2); }
+.tabbar__item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--ink-900); background: none; border: none;
+  min-height: 48px; padding-top: 6px;
+}
+.tabbar__item span {
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+/* ── 9. Type-led lists — the app's main content shape ────────────────────── */
+.list { border-top: 1.5px solid rgba(25, 20, 16, 0.28); }
+.list__row {
+  display: flex; align-items: center; gap: var(--s4, 16px);
+  padding: 14px 0;
+  border-bottom: 1.5px solid rgba(25, 20, 16, 0.28);
+}
+.list__avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid var(--ink-900);
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 15px; font-weight: 800;
+  background: var(--paper-50); color: var(--ink-900);
+}
+.list__name {
+  font-family: var(--font-display); font-size: 19px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.01em;
+}
+.list__meta { margin-top: 2px; }
+.list__action {
+  margin-left: auto;
+  font-family: var(--font-display); font-size: 14px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* ── 10. Presence ─────────────────────────────────────────────────────────── */
+.live-dot {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-display); font-size: 12.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+.live-dot::before {
+  content: ''; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--live);
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* ── 11. Motion — Softly's low velocity, reduced-motion safe ────────────── */
+:root {
+  --dur-state: 140ms;
+  --dur-enter: 520ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  /* The storyboard's own rule: with reduced motion, the mark arrives settled
+     and the field updates on the next render. [r4] */
+  .scribble path { stroke-dashoffset: 0; }
+  .live-dot::before { animation: none; opacity: 1; }
+}
+
+/* ── 12. Hard constraints ───────────────────────────────────────────────────
+   1. ONE hand-drawn device: the scribble stroke. No other hand-drawn element.
+   2. ONE radius: 12px. No sketch radii, no pills, no blob shapes.
+   3. Handwriting (Caveat) is CONTENT ONLY — a user's own words, notes, names
+      and marks. Never a heading, label, button or nav item.
+   4. The marker palette is CONTENT ONLY. Never a button, badge, toast or link.
+   5. The field is the ground. The shirt is the only white object on it.
+   6. One accent per screen: the live red, on the presence indicator only.
+   7. Hard offset shadows only (press on active). No soft blurry elevation.
+   8. Every interactive element: 44px minimum target, visible focus ring.
+*/

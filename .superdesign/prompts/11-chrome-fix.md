@@ -1,0 +1,11 @@
+Keep the entire layout, typography, spacing, colors and structure of this page exactly as they are. The top bar, the name, the two mono lines, the Sign this shirt button, THE SHIRT section, the SHIRT 1 / SHIRT 2 tabs, the FRONT / BACK tabs, the shirt card, the shirt map, the yearbook card, RECENT ACTIVITY and the footer are all correct. Do not redesign them.
+
+Fix only the three things below. They are the same underlying mistake - the wrong kind of image.
+
+1. THE HERO MUST NOT BE A PHOTOGRAPH. The large image in the hero is currently a stock photo of a real man. This product has no photographs and no real faces - every person in it is a flat vector illustration. Replace the hero image with the product's own avatar: a flat vector illustration of a young person seen from the chest up, wearing a plain white T-shirt, drawn in a clean flat style with simple shapes and no gradients, on a light neutral ground. The figure should be simple and graphic - a silhouette-like illustrated avatar, not a detailed realistic rendering, and not a face photo. Put it on the same white card with the 1px border and the single soft shadow.
+
+2. THE TOP-RIGHT AVATAR AND THE ACTIVITY THUMBNAILS ARE WRONG. The circular avatar in the top right is currently an emoji, and the four small squares in the activity list are empty beige blocks. All five must be the same flat vector avatar illustration as the hero, in a circular crop for the top right and a square crop for the activity thumbnails. No emoji, no initials, no empty placeholder blocks, no photographs.
+
+3. THE T-SHIRT IN THE WHITE CARD IS INVISIBLE. It is currently a very faint outline. Draw it clearly: a clean flat vector T-shirt - body, two short sleeves, a collar - with a thin but clearly visible dark ink outline, white fill, sitting on the white card. Cover it with visible marker marks in the marker colours: a blue handwritten scrawl, a red heart, a green doodle, an orange star. All the marks are drawn ON the white fabric, inside the shirt outline, never on the card.
+
+Everything else stays. Use ONLY the fonts, colors, spacing, radius, shadow and component styles defined in the design system. Do not introduce any fonts, colors, or visual styles not in the design system. Gold appears nowhere on this page. No emoji, no photographs, no gradients, no stickers floating outside the shirt.

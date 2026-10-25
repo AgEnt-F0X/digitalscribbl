@@ -1,7 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { isPrototypeMode, createPrototypeClient } from './prototype'
 
 export async function createClient() {
+  if (isPrototypeMode()) return createPrototypeClient()
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -26,6 +28,7 @@ export async function createClient() {
 
 /** Service-role client — bypasses RLS. Use only in server-side API routes. */
 export async function createServiceClient() {
+  if (isPrototypeMode()) return createPrototypeClient()
   const cookieStore = await cookies()
 
   return createServerClient(

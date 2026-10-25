@@ -1,0 +1,13 @@
+Keep the concept and the typography of this page exactly as they are. The two-column structure, the running head, the display serif name AARAV SHARMA, the SIGNED BY heading, the directory of twelve names each paired with a sample of that person's handwriting, and the closing line are all correct. Do not redesign the concept.
+
+Fix these four layout defects:
+
+1. THE SHIRT IS A THUMBNAIL. It must be the dominant object of the left column. At a 1280px-wide design the shirt plate should be a 3:4 portrait plate roughly 230px wide - about 60 percent of the left column width - and the T-shirt inside it should fill nearly the whole plate, with at least eight marker marks in the marker colours still clearly legible on the white fabric. Right now it is a tiny drawing floating in a large mat.
+
+2. REMOVE THE NESTED WHITE SQUARE. The plate must not contain a smaller white rectangle inside a larger tan rectangle. The T-shirt itself is the only white shape; it sits directly on the deeper cream mat of the plate. Draw the shirt as a clean flat vector tee - body, two short sleeves, collar - with a thin dark ink outline, white fill, and the marker marks drawn on top of that white fill, inside the outline, never on the mat.
+
+3. NAMES MUST NOT WRAP AND MUST NOT COLLIDE. Every one of the twelve names must sit on a single line - shorten the letter-spacing and drop the name size slightly if needed, and give the left column of each row a fixed width so the name never pushes into the handwriting. Each row is: name flush left on one line, then the handwriting sample right-aligned in its own fixed-width column, in the handwriting font at about 16px, on one line - things like legend, bestie, dk, ship it, yay, tysm, miss u, lolz, ok bye, lit, finally. If a sample is too long for its column, shorten it rather than letting it wrap. Nothing may overlap, and the hairline under each row must run the full width of the row.
+
+4. CLOSE THE DEAD SPACE. After the shirt and the name there is a large empty void in the left column. The enlarged shirt plus the name plus the programme line should fill that column naturally. Make the programme line under the name a single line of body sans at 15px reading B.Tech Computer Science and Engineering, 2026 - if it is too long for one line, set it on two. On the right, the closing line should sit directly beneath the last directory row with a normal 48px gap, not float at the bottom of the column.
+
+Use ONLY the fonts, colors, spacing, radius, shadow and component styles defined in the design system. Do not introduce any fonts, colors, or visual styles not in the design system. Gold appears nowhere on this page.
